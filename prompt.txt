@@ -1,0 +1,4 @@
+intellij-idea-ultimatewe have these ppt slides on working on a system to speed up developemt and production with ai, this is asystem that i want to work on so that projects can be developed, maintained at a higher speed without needing dev work, this system has been outline detailly in the documents, do a deep research and provide a concrete implimentation plan how how i should impliment this system that can be used and analyze and explore the tools and everything to be thebest
+
+
+architecturual diagram also of the system and how projects can be used with this system
