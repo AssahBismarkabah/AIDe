@@ -1,533 +1,927 @@
-# AI-Assisted Software Engineering System - Design Document
+# Design Document
 
 ## Overview
 
-This design document outlines the architecture for an AI-assisted software engineering system that transforms traditional development workflows through knowledge graph-centric approaches. The system creates a "digital twin" of software systems using Neo4j graph databases, orchestrates AI agents with CrewAI, and provides intelligent automation through LangChain-powered RAG (Retrieval-Augmented Generation) workflows.
+The AI-Assisted Software Engineering System is a comprehensive platform that transforms traditional development workflows by creating a "digital twin" of software systems through versioned knowledge graphs. The system employs a 5-layer architecture with local-first deployment, multi-agent AI orchestration, and enterprise-grade integrations to provide automated development workflows, documentation generation, and architectural governance.
 
-The architecture follows a four-layer design pattern optimized for scalability, modularity, and enterprise adoption, supporting both legacy system modernization and new application development workflows.
+The design follows a hybrid approach combining local Neo4j databases for development with cloud scalability options, versioned RDF modules for knowledge representation, and specialized AI agents for different analysis tasks.
 
 ## Architecture
 
 ### High-Level System Architecture
 
-```mermaid
-graph TB
-    subgraph "External Systems"
-        GIT[Git Repositories]
-        CICD[CI/CD Pipelines]
-        JIRA[Jira/Project Management]
-        IDE[IDEs & Development Tools]
-    end
+The system follows a 5-layer architecture optimized for scalability, developer experience, and enterprise adoption:
 
-    subgraph "Layer 1: AI-Powered Fact Extraction & Orchestration"
-        direction TB
-        INGEST[Code Ingestion Service]
-        AST[AST Analysis Engine]
-        LLM_ANALYSIS[LLM Analysis Service]
-        ORCHESTRATOR[CrewAI Orchestration Engine]
-        
-        INGEST --> AST
-        INGEST --> LLM_ANALYSIS
-        AST --> ORCHESTRATOR
-        LLM_ANALYSIS --> ORCHESTRATOR
-    end
-
-    subgraph "Layer 2: Knowledge Graph Database"
-        direction TB
-        NEO4J[(Neo4j Graph Database)]
-        SCHEMA[Graph Schema Manager]
-        QUERY_ENGINE[Cypher Query Engine]
-        
-        SCHEMA --> NEO4J
-        NEO4J --> QUERY_ENGINE
-    end
-
-    subgraph "Layer 3: AI/LLM Integration & Reasoning"
-        direction TB
-        LANGCHAIN[LangChain RAG Engine]
-        GRAPH_QA[GraphCypherQAChain]
-        LLM_GATEWAY[LLM Gateway Service]
-        
-        LANGCHAIN --> GRAPH_QA
-        GRAPH_QA --> LLM_GATEWAY
-    end
-
-    subgraph "Layer 4: Artifact Generation & Workflow Automation"
-        direction TB
-        DOC_GEN[Documentation Generator]
-        TEST_GEN[Test Generator]
-        TICKET_GEN[Ticket Generator]
-        REFACTOR[Refactoring Advisor]
-        
-        DOC_GEN --> DOCTOOLCHAIN[docToolchain]
-        TEST_GEN --> TEST_FRAMEWORKS[Test Frameworks]
-        TICKET_GEN --> JIRA_API[Jira REST API]
-    end
-
-    subgraph "Layer 5: Enterprise Integration & APIs"
-        direction TB
-        API_GATEWAY[API Gateway]
-        AUTH[Authentication Service]
-        MONITORING[Monitoring & Observability]
-        WEB_UI[Web Interface]
-        MCP_SERVER[MCP Server]
-    end
-
-    %% Connections
-    GIT --> INGEST
-    CICD --> INGEST
-    IDE --> MCP_SERVER
-    
-    ORCHESTRATOR --> NEO4J
-    QUERY_ENGINE --> LANGCHAIN
-    LANGCHAIN --> DOC_GEN
-    LANGCHAIN --> TEST_GEN
-    LANGCHAIN --> TICKET_GEN
-    LANGCHAIN --> REFACTOR
-    
-    API_GATEWAY --> WEB_UI
-    AUTH --> API_GATEWAY
-    MONITORING --> API_GATEWAY
-    
-    JIRA_API --> JIRA
-    MCP_SERVER --> IDE
-
-    %% Styling
-    classDef layer1 fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-    classDef layer2 fill:#E8F5E8,stroke:#388E3C,stroke-width:2px
-    classDef layer3 fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
-    classDef layer4 fill:#FCE4EC,stroke:#C2185B,stroke-width:2px
-    classDef layer5 fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
-    classDef external fill:#FAFAFA,stroke:#616161,stroke-width:2px
-
-    class INGEST,AST,LLM_ANALYSIS,ORCHESTRATOR layer1
-    class NEO4J,SCHEMA,QUERY_ENGINE layer2
-    class LANGCHAIN,GRAPH_QA,LLM_GATEWAY layer3
-    class DOC_GEN,TEST_GEN,TICKET_GEN,REFACTOR,DOCTOOLCHAIN,TEST_FRAMEWORKS,JIRA_API layer4
-    class API_GATEWAY,AUTH,MONITORING,WEB_UI,MCP_SERVER layer5
-    class GIT,CICD,JIRA,IDE external
+```
+┌─────────────────────────────────────────────────────────────┐
+│                Layer 5: Integration & APIs                  │
+│  API Gateway | Authentication | Monitoring | Web UI | MCP   │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│            Layer 4: Developer Assistance                    │
+│  Code Assistant | Refactoring | Documentation | Tests      │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│               Layer 3: AI/LLM Integration                   │
+│  LangChain RAG | GraphCypher QA | LLM Gateway | RDF Query   │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│          Layer 2: Versioned Knowledge Graph Core            │
+│  Local Neo4j | RDF Modules | Version Manager | In-Memory   │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│           Layer 1: Data Ingestion & Analysis                │
+│  Code Ingestion | AST Analysis | RDF Generation | CrewAI    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Technology Stack Selection
+### Layer 1: Data Ingestion & Analysis
 
-Based on comprehensive research and analysis of available tools, the following technology stack provides optimal performance, scalability, and maintainability:
+**Purpose**: Transform source code into structured knowledge representations
 
-#### Core Technologies
-- **Graph Database**: Neo4j (market leader with excellent Cypher support and enterprise features)
-- **AI Orchestration**: CrewAI (role-based multi-agent collaboration with delegation capabilities)
-- **LLM Integration**: LangChain (comprehensive RAG support with GraphCypherQAChain)
-- **Code Analysis**: CodeGraph Analyzer (direct Neo4j integration, multi-language support)
-- **Documentation**: docToolchain + AsciiDoc (enterprise-grade documentation pipeline)
+**Components**:
 
-#### Supporting Technologies
-- **Container Orchestration**: Kubernetes
-- **Message Queue**: Apache Kafka
-- **Caching**: Redis
-- **Monitoring**: Prometheus + Grafana
-- **Authentication**: Keycloak
-- **API Gateway**: Kong
+1. **Code Ingestion Service**
+   - Monitors Git repositories via webhooks
+   - Handles multiple programming languages (Java, Python, JavaScript, C++, COBOL)
+   - Processes incremental changes and full repository analysis
+   - Integrates with CI/CD pipelines
 
-## Components and Interfaces
+2. **AST Analysis Engine**
+   - Generates Abstract Syntax Trees for all supported languages
+   - Extracts code structure, dependencies, and relationships
+   - Calculates complexity metrics and quality indicators
+   - Identifies architectural patterns and anti-patterns
 
-### Layer 1: AI-Powered Fact Extraction & Orchestration
+3. **RDF Generator**
+   - Converts AST data into RDF (Resource Description Framework) format
+   - Creates versioned, modular RDF representations
+   - Follows semantic web standards for interoperability
+   - Generates Turtle (.ttl) files for human readability
 
-#### Code Ingestion Service
-**Purpose**: Monitors and ingests code changes from various sources
-**Technology**: Python FastAPI service with Git webhooks
-**Interfaces**:
-- REST API for manual ingestion
-- Webhook endpoints for Git repositories
-- Message queue integration for async processing
+4. **CrewAI Orchestration Engine**
+   - Coordinates specialized AI agents for different analysis tasks
+   - Manages agent collaboration and task delegation
+   - Maintains context and memory across agent interactions
+   - Provides autonomous decision-making capabilities
 
-```python
-class CodeIngestionService:
-    def ingest_repository(self, repo_url: str, branch: str = "main") -> IngestionJob
-    def process_webhook(self, webhook_data: dict) -> None
-    def get_ingestion_status(self, job_id: str) -> IngestionStatus
-```
+### Layer 2: Versioned Knowledge Graph Core
 
-#### AST Analysis Engine
-**Purpose**: Performs static code analysis using Abstract Syntax Trees
-**Technology**: CodeGraph Analyzer with custom extensions
-**Interfaces**:
-- Direct Neo4j integration
-- Support for Java, Python, JavaScript, C++, COBOL
-- Incremental analysis capabilities
+**Purpose**: Store and manage versioned knowledge representations with hybrid storage approach
 
-```python
-class ASTAnalysisEngine:
-    def analyze_files(self, file_paths: List[str]) -> List[CodeEntity]
-    def extract_relationships(self, entities: List[CodeEntity]) -> List[Relationship]
-    def update_graph(self, entities: List[CodeEntity], relationships: List[Relationship]) -> None
-```
+**Components**:
 
-#### LLM Analysis Service
-**Purpose**: Provides semantic understanding through Large Language Models
-**Technology**: LangChain with multiple LLM providers (OpenAI, Anthropic, local models)
-**Interfaces**:
-- Code summarization
-- Pattern detection
-- Semantic relationship extraction
+1. **Local Neo4j Database**
+   - Primary persistence layer for complex graph queries
+   - Optimized for relationship traversals and pattern matching
+   - Supports APOC procedures for advanced graph algorithms
+   - Provides high-performance Cypher query execution
 
-```python
-class LLMAnalysisService:
-    def summarize_code(self, code_snippet: str, context: dict) -> str
-    def detect_patterns(self, code_entities: List[CodeEntity]) -> List[Pattern]
-    def extract_semantic_relationships(self, code_context: str) -> List[SemanticRelationship]
-```
+2. **RDF Module Store**
+   - RDF files generated and stored within each codebase module directory
+   - Each module contains its own `.module-knowledge.ttl` file with rich content about that module
+   - Developer-editable RDF files that can be manually updated to enhance system knowledge
+   - Git-aligned versioning with semantic tags for collaborative knowledge evolution
+   - Distributed knowledge approach where each module maintains its own semantic representation
+   - Human-readable Turtle format for developer inspection and manual enhancement
 
-#### CrewAI Orchestration Engine
-**Purpose**: Coordinates multi-agent workflows for complex analysis tasks
-**Technology**: CrewAI with custom agent definitions
-**Interfaces**:
-- Agent management and coordination
-- Task delegation and execution
-- Workflow state management
+3. **Version Manager**
+   - Git-like versioning for graph states aligned with code commits
+   - Tracks changes in both code and knowledge representations
+   - Maintains metadata about versions, modules, and developer contributions
+   - Enables diff operations between graph versions and knowledge evolution
+   - Supports collaborative knowledge enhancement through developer RDF updates
 
-```python
-class OrchestrationEngine:
-    def create_analysis_crew(self, task_type: str) -> Crew
-    def execute_workflow(self, crew: Crew, inputs: dict) -> WorkflowResult
-    def monitor_progress(self, workflow_id: str) -> WorkflowStatus
-```
+4. **Hybrid Storage Manager**
+   - Coordinates between Neo4j, RDF files, and in-memory storage
+   - Optimizes query routing based on use case
+   - Manages data synchronization across storage layers
+   - Provides unified interface for data access
 
-### Layer 2: Knowledge Graph Database
-
-#### Neo4j Graph Database
-**Purpose**: Central repository for all code knowledge and relationships
-**Technology**: Neo4j Enterprise with clustering support
-**Schema Design**:
-
-```cypher
-// Core node types
-CREATE CONSTRAINT FOR (f:File) REQUIRE f.path IS UNIQUE;
-CREATE CONSTRAINT FOR (c:Class) REQUIRE (c.name, c.file_path) IS UNIQUE;
-CREATE CONSTRAINT FOR (m:Method) REQUIRE (m.name, m.class_name, m.file_path) IS UNIQUE;
-
-// Relationship types
-(:File)-[:IMPORTS]->(:File)
-(:Class)-[:EXTENDS]->(:Class)
-(:Class)-[:IMPLEMENTS]->(:Interface)
-(:Method)-[:CALLS]->(:Method)
-(:Method)-[:USES]->(:Variable)
-(:Component)-[:DEPENDS_ON]->(:Component)
-```
-
-#### Graph Schema Manager
-**Purpose**: Manages graph schema evolution and validation
-**Technology**: Custom Python service with Neo4j driver
-**Interfaces**:
-- Schema versioning and migration
-- Constraint management
-- Index optimization
-
-```python
-class GraphSchemaManager:
-    def apply_migration(self, migration_script: str) -> MigrationResult
-    def validate_schema(self) -> ValidationResult
-    def optimize_indexes(self) -> OptimizationResult
-```
+5. **In-Memory RDF Store**
+   - Fast RDF queries using RDFLib for LLM interactions
+   - Optimized for SPARQL query execution
+   - Reduces latency for AI agent operations
+   - Supports real-time knowledge graph updates
 
 ### Layer 3: AI/LLM Integration & Reasoning
 
-#### LangChain RAG Engine
-**Purpose**: Provides intelligent query processing and response generation
-**Technology**: LangChain with custom chains and retrievers
-**Interfaces**:
-- Natural language to Cypher translation
-- Context-aware response generation
-- Multi-modal knowledge retrieval
+**Purpose**: Provide intelligent querying and reasoning capabilities over the knowledge graph
 
-```python
-class RAGEngine:
-    def query_knowledge_graph(self, natural_language_query: str) -> QueryResult
-    def generate_response(self, query_result: QueryResult, context: dict) -> str
-    def explain_reasoning(self, query: str, result: QueryResult) -> Explanation
+**Components**:
+
+1. **LangChain RAG Engine**
+   - Retrieval-Augmented Generation for context-aware responses
+   - Integrates with multiple LLM providers (OpenAI, Anthropic, local models)
+   - Provides semantic search over code knowledge
+   - Supports complex reasoning chains
+
+2. **GraphCypherQAChain**
+   - Natural language to Cypher query translation
+   - Optimized for Neo4j graph database queries
+   - Handles complex graph traversals and pattern matching
+   - Provides explainable query results
+
+3. **SPARQL Query Engine**
+   - Natural language to SPARQL query translation
+   - Optimized for RDF knowledge base queries
+   - Supports semantic reasoning over ontologies
+   - Enables federated queries across RDF sources
+
+4. **LLM Gateway Service**
+   - Unified interface to multiple LLM providers
+   - Load balancing and failover capabilities
+   - Cost optimization and usage tracking
+   - Response caching and rate limiting
+
+5. **Reasoning Engine**
+   - Combines graph data with LLM reasoning
+   - Performs inference over code relationships
+   - Identifies patterns and anomalies
+   - Generates insights and recommendations
+
+### Layer 4: Code Implementation & Modification Engine
+
+**Purpose**: Actively implement code changes, features, and refactoring using deep knowledge of the codebase structure and relationships
+
+**Components**:
+
+1. **Feature Implementation Engine**
+   - Implements new features by understanding existing codebase patterns
+   - Generates complete code implementations following project conventions
+   - Integrates new code with existing architecture and dependencies
+   - Creates necessary supporting files (configs, migrations, etc.)
+
+2. **Code Modification Engine**
+   - Modifies existing code while maintaining consistency with codebase patterns
+   - Updates related files when changes affect dependencies
+   - Ensures changes follow established architectural principles
+   - Handles complex refactoring across multiple files and modules
+
+3. **Smart Refactoring Engine**
+   - Performs intelligent refactoring using knowledge graph relationships
+   - Updates all affected references and dependencies automatically
+   - Maintains code functionality while improving structure
+   - Suggests and implements architectural improvements
+
+4. **Context-Aware Code Generator**
+   - Generates code that fits seamlessly into existing codebase
+   - Uses knowledge of existing patterns, naming conventions, and styles
+   - Creates implementations that leverage existing utilities and services
+   - Ensures generated code follows project-specific best practices
+
+5. **Integration Assistant**
+   - Handles complex integrations between new and existing code
+   - Updates configuration files, dependency declarations, and build scripts
+   - Creates necessary database migrations and schema updates
+   - Manages API contract changes and backward compatibility
+
+### Layer 5: Enterprise Integration & APIs
+
+**Purpose**: Provide enterprise-grade interfaces and integrations
+
+**Components**:
+
+1. **API Gateway**
+   - RESTful and GraphQL APIs for system access
+   - Rate limiting and request throttling
+   - API versioning and backward compatibility
+   - Comprehensive API documentation
+
+2. **Authentication Service**
+   - SSO integration with enterprise identity providers
+   - Role-based access control (RBAC)
+   - JWT token management
+   - Audit logging for security compliance
+
+3. **Monitoring & Observability**
+   - Prometheus metrics collection
+   - Grafana dashboards for system health
+   - Distributed tracing with Jaeger
+   - Log aggregation and analysis
+
+4. **Web Interface**
+   - Modern React-based user interface
+   - Interactive knowledge graph visualization
+   - Real-time system status and metrics
+   - User-friendly query builder
+
+5. **MCP Server**
+   - Model Context Protocol server for IDE integration
+   - Provides tools for code analysis and generation
+   - Supports IntelliJ IDEA and VS Code extensions
+   - Enables real-time developer assistance
+
+## Components and Interfaces
+
+### Core Data Models
+
+#### RDF Ontology Schema
+
+```turtle
+@prefix aaswe: <http://aaswe.org/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Core Classes
+aaswe:Project a owl:Class ;
+    rdfs:label "Software Project" ;
+    rdfs:comment "A software project containing modules and components" .
+
+aaswe:Module a owl:Class ;
+    rdfs:label "Code Module" ;
+    rdfs:comment "A logical grouping of related code files" .
+
+aaswe:Class a owl:Class ;
+    rdfs:label "Code Class" ;
+    rdfs:comment "A class definition in source code" .
+
+aaswe:Method a owl:Class ;
+    rdfs:label "Code Method" ;
+    rdfs:comment "A method or function definition" .
+
+# Properties
+aaswe:hasModule a owl:ObjectProperty ;
+    rdfs:domain aaswe:Project ;
+    rdfs:range aaswe:Module .
+
+aaswe:contains a owl:ObjectProperty ;
+    rdfs:domain aaswe:Module ;
+    rdfs:range aaswe:Class .
+
+aaswe:calls a owl:ObjectProperty ;
+    rdfs:domain aaswe:Method ;
+    rdfs:range aaswe:Method .
+
+aaswe:complexity a owl:DatatypeProperty ;
+    rdfs:domain aaswe:Method ;
+    rdfs:range xsd:integer .
 ```
 
-#### GraphCypherQAChain
-**Purpose**: Specialized chain for graph database question answering
-**Technology**: LangChain GraphCypherQAChain with custom prompts
-**Configuration**:
-- Custom Cypher generation prompts
-- Result validation and error handling
-- Query optimization
+#### Neo4j Graph Schema
 
-### Layer 4: Artifact Generation & Workflow Automation
+```cypher
+// Node types
+CREATE CONSTRAINT project_name IF NOT EXISTS FOR (p:Project) REQUIRE p.name IS UNIQUE;
+CREATE CONSTRAINT module_name IF NOT EXISTS FOR (m:Module) REQUIRE m.name IS UNIQUE;
+CREATE CONSTRAINT class_name IF NOT EXISTS FOR (c:Class) REQUIRE c.name IS UNIQUE;
+CREATE CONSTRAINT method_signature IF NOT EXISTS FOR (m:Method) REQUIRE m.signature IS UNIQUE;
 
-#### Documentation Generator
-**Purpose**: Generates and maintains architectural documentation
-**Technology**: Custom Python service with docToolchain integration
-**Interfaces**:
-- arc42 template generation
-- Diagram creation (Mermaid/PlantUML)
-- Multi-format publishing
-
-```python
-class DocumentationGenerator:
-    def generate_arc42_docs(self, project_id: str) -> DocumentationResult
-    def create_architecture_diagrams(self, graph_query: str) -> List[Diagram]
-    def publish_documentation(self, docs: Documentation, formats: List[str]) -> PublishResult
+// Indexes for performance
+CREATE INDEX project_version IF NOT EXISTS FOR (p:Project) ON (p.version);
+CREATE INDEX module_language IF NOT EXISTS FOR (m:Module) ON (m.language);
+CREATE INDEX class_complexity IF NOT EXISTS FOR (c:Class) ON (c.complexity);
+CREATE INDEX method_calls IF NOT EXISTS FOR ()-[r:CALLS]-() ON (r.frequency);
 ```
 
-#### Test Generator
-**Purpose**: Generates comprehensive test suites based on code analysis
-**Technology**: Custom service with framework-specific templates
-**Interfaces**:
-- Unit test generation
-- Integration test scenario identification
-- Test coverage analysis
+### API Interfaces
 
-```python
-class TestGenerator:
-    def generate_unit_tests(self, method_info: MethodInfo) -> List[TestCase]
-    def identify_integration_scenarios(self, component_graph: Graph) -> List[IntegrationScenario]
-    def analyze_coverage_gaps(self, existing_tests: List[TestCase]) -> CoverageAnalysis
+#### REST API Endpoints
+
+```yaml
+# Core Analysis API
+GET /api/v1/projects/{projectId}/analysis
+POST /api/v1/projects/{projectId}/analyze
+GET /api/v1/projects/{projectId}/modules
+GET /api/v1/modules/{moduleId}/dependencies
+
+# Query API
+POST /api/v1/query/natural-language
+POST /api/v1/query/cypher
+POST /api/v1/query/sparql
+
+# Artifact Generation API
+POST /api/v1/generate/documentation
+POST /api/v1/generate/tests
+POST /api/v1/generate/tickets
+
+# Version Management API
+GET /api/v1/versions
+POST /api/v1/versions/{version}/snapshot
+GET /api/v1/versions/{version}/diff/{otherVersion}
 ```
 
-#### Ticket Generator
-**Purpose**: Automatically creates and manages development tickets
-**Technology**: Custom service with Jira REST API integration
-**Interfaces**:
-- Issue detection and classification
-- Ticket creation with context
-- Progress tracking and updates
+#### GraphQL Schema
+
+```graphql
+type Project {
+  id: ID!
+  name: String!
+  version: String!
+  modules: [Module!]!
+  metrics: ProjectMetrics!
+}
+
+type Module {
+  id: ID!
+  name: String!
+  language: String!
+  classes: [Class!]!
+  dependencies: [Dependency!]!
+  complexity: Int!
+}
+
+type Class {
+  id: ID!
+  name: String!
+  methods: [Method!]!
+  fields: [Field!]!
+  relationships: [Relationship!]!
+}
+
+type Query {
+  project(id: ID!): Project
+  searchCode(query: String!): [SearchResult!]!
+  analyzeArchitecture(projectId: ID!): ArchitectureAnalysis!
+}
+
+type Mutation {
+  analyzeProject(input: AnalyzeProjectInput!): AnalysisResult!
+  generateDocumentation(input: GenerateDocsInput!): DocumentationResult!
+  generateTests(input: GenerateTestsInput!): TestGenerationResult!
+}
+```
+
+### Multi-Agent Architecture
+
+#### Agent Definitions
 
 ```python
-class TicketGenerator:
-    def detect_issues(self, analysis_results: AnalysisResult) -> List[Issue]
-    def create_jira_ticket(self, issue: Issue) -> JiraTicket
-    def update_ticket_progress(self, ticket_id: str, progress: Progress) -> None
+# Code Analyzer Agent
+code_analyzer = Agent(
+    role='Senior Code Analyzer',
+    goal='Analyze code structure and identify patterns, dependencies, and quality metrics',
+    backstory='Expert in static code analysis with deep knowledge of multiple programming languages',
+    tools=['ast_parser', 'complexity_calculator', 'dependency_analyzer'],
+    allow_delegation=True,
+    memory=True,
+    max_iter=5
+)
+
+# Software Architect Agent
+architect = Agent(
+    role='Software Architect',
+    goal='Validate architectural decisions, identify patterns, and ensure compliance',
+    backstory='Experienced architect with expertise in system design and architectural governance',
+    tools=['architecture_validator', 'pattern_detector', 'compliance_checker'],
+    allow_delegation=True,
+    memory=True,
+    max_iter=5
+)
+
+# Documentation Writer Agent
+doc_writer = Agent(
+    role='Technical Documentation Specialist',
+    goal='Generate comprehensive, accurate, and well-structured documentation',
+    backstory='Expert technical writer with knowledge of arc42 and documentation best practices',
+    tools=['doc_generator', 'template_processor', 'content_validator'],
+    allow_delegation=False,
+    memory=True,
+    max_iter=3
+)
+
+# Test Engineer Agent
+test_engineer = Agent(
+    role='Test Automation Engineer',
+    goal='Generate comprehensive test suites with high coverage and quality',
+    backstory='Expert in test-driven development and automated testing frameworks',
+    tools=['test_generator', 'coverage_analyzer', 'test_validator'],
+    allow_delegation=False,
+    memory=True,
+    max_iter=4
+)
+```
+
+## Binary Tool Deployment Architecture
+
+### Local Service Management
+
+Since the tool is distributed as a binary (`aaswe`), all services from the 5-layer architecture must run locally on the user's machine. The binary handles service lifecycle management automatically:
+
+#### Embedded Services Approach (Recommended)
+
+```yaml
+aaswe-binary-architecture:
+  embedded-components:
+    # Layer 1: Data Ingestion & Analysis
+    ast-parsers: "Built-in parsers for Java, Python, JavaScript, etc."
+    rdf-generator: "RDFLib-based RDF generation engine"
+    code-ingestion: "File system monitoring and Git integration"
+    
+    # Layer 2: Knowledge Graph Core  
+    embedded-neo4j: "Neo4j embedded database (no separate process)"
+    rdf-store: "In-memory RDFLib graphs for fast queries"
+    version-manager: "Git-aligned versioning system"
+    
+    # Layer 3: AI/LLM Integration
+    llm-clients: "HTTP clients for OpenAI, Anthropic, local models"
+    langchain-rag: "RAG engine with embedded vector store"
+    query-engines: "Cypher and SPARQL query translation"
+    
+    # Layer 4: Code Implementation
+    code-generators: "Template engines and code modification tools"
+    refactoring-engine: "AST-based refactoring capabilities"
+    
+    # Layer 5: Integration APIs
+    mcp-server: "Model Context Protocol server for IDEs"
+    external-integrations: "Jira, Confluence, CI/CD webhooks"
+
+  initialization-process:
+    install: |
+      # User installs binary (single executable)
+      curl -sSL https://install.aaswe.dev | sh
+      # or: brew install aaswe
+      # or: Download from GitHub releases
+    
+    first-run: |
+      # Binary auto-initializes on first execution
+      aaswe --version
+      # Creates ~/.aaswe/ directory
+      # Downloads required models/dependencies
+      # Initializes embedded Neo4j database
+      # Sets up default configuration
+    
+    project-setup: |
+      # Initialize in existing codebase
+      cd /path/to/project
+      aaswe init
+      # Analyzes codebase structure
+      # Generates .module-knowledge.ttl files
+      # Creates .aaswe/config.json
+      # Populates local knowledge graph
+```
+
+#### Service Lifecycle Management
+
+```python
+# Binary manages all services internally
+class AASWEBinary:
+    def __init__(self):
+        self.embedded_neo4j = EmbeddedNeo4jDatabase()
+        self.rdf_store = InMemoryRDFStore()
+        self.llm_gateway = LLMGatewayService()
+        self.mcp_server = MCPServer()
+        
+    def start_services(self):
+        # All services start with binary
+        self.embedded_neo4j.start()
+        self.rdf_store.initialize()
+        self.llm_gateway.configure()
+        self.mcp_server.start_background()
+        
+    def stop_services(self):
+        # Clean shutdown when binary exits
+        self.mcp_server.stop()
+        self.embedded_neo4j.shutdown()
+```
+
+#### Directory Structure After Installation
+
+```
+# Global configuration
+~/.aaswe/
+├── config.json              # Global settings
+├── neo4j/                   # Embedded Neo4j data
+├── models/                  # Downloaded AI models
+├── cache/                   # Query and response cache
+└── logs/                    # System logs
+
+# Project-specific (after aaswe init)
+/path/to/project/
+├── src/
+│   ├── module1/
+│   │   ├── *.java
+│   │   └── .module-knowledge.ttl
+│   └── module2/
+│       ├── *.py  
+│       └── .module-knowledge.ttl
+├── .aaswe/
+│   ├── config.json          # Project settings
+│   └── versions.json        # Knowledge versions
+└── .gitignore               # Includes .aaswe/cache/
+```
+
+#### Alternative: Docker-Managed Services
+
+For users who prefer containerized services:
+
+```yaml
+aaswe-docker-mode:
+  auto-managed-containers:
+    neo4j:
+      image: "neo4j:5.15-community"
+      data-volume: "~/.aaswe/neo4j"
+      auto-start: true
+      
+    redis:
+      image: "redis:7-alpine" 
+      data-volume: "~/.aaswe/redis"
+      auto-start: true
+      
+  binary-responsibilities:
+    - "Automatically starts/stops containers"
+    - "Handles port conflicts and networking"
+    - "Manages container health and restarts"
+    - "Provides unified CLI interface"
+    
+  user-experience:
+    transparent: "User doesn't need to know about containers"
+    automatic: "Services start when binary is used"
+    cleanup: "Containers stop when not needed"
+```
+
+## Collaborative Knowledge Enhancement
+
+### Developer-Driven Knowledge Evolution
+
+The system supports a collaborative approach where developers can enhance the AI's understanding of the codebase through manual RDF updates:
+
+#### RDF File Management Workflow
+
+1. **Automatic Generation**: System generates initial RDF files from code analysis
+2. **Developer Enhancement**: Developers can manually edit RDF files to add:
+   - Business logic explanations
+   - Architectural intent and design decisions
+   - Domain-specific knowledge and context
+   - Integration patterns and dependencies
+   - Performance considerations and constraints
+
+3. **Version Control Integration**: RDF files are tracked in Git alongside code
+4. **Collaborative Updates**: Team members can contribute knowledge through pull requests
+5. **Knowledge Validation**: System validates RDF syntax and consistency
+
+#### Working with New vs Existing Codebases
+
+**New Codebases**:
+- System starts with minimal knowledge from initial code analysis
+- Developers gradually enhance RDF files as they implement features
+- Knowledge base grows organically with the codebase
+- AI assistance improves over time as more context is added
+
+**Existing Codebases**:
+- System performs comprehensive initial analysis of entire codebase
+- Generates extensive RDF knowledge base from existing code patterns
+- Developers can immediately benefit from AI assistance based on existing patterns
+- Legacy knowledge can be enhanced with business context and architectural decisions
+
+#### Knowledge Enhancement Examples
+
+```turtle
+# Developer-enhanced RDF with business context
+@prefix aaswe: <http://aaswe.org/ontology#> .
+@prefix business: <http://company.com/business#> .
+
+<http://aaswe.org/modules/UserService> a aaswe:Module ;
+    rdfs:label "User Service" ;
+    business:purpose "Handles user authentication and profile management" ;
+    business:criticalPath "true" ;
+    business:performanceRequirement "< 100ms response time" ;
+    aaswe:architecturalPattern "Hexagonal Architecture" ;
+    aaswe:designDecision "Uses JWT tokens for stateless authentication" .
+
+<http://aaswe.org/classes/UserController> a aaswe:Class ;
+    business:responsibility "REST API endpoints for user operations" ;
+    business:securityLevel "high" ;
+    aaswe:integrationPoint "External OAuth providers" .
 ```
 
 ## Data Models
 
-### Core Graph Entities
+### Project Structure
 
-```python
-from pydantic import BaseModel
-from typing import List, Dict, Optional
-from enum import Enum
+```
+example-codebase/                    # Target codebase being analyzed
+├── src/
+│   ├── user-service/
+│   │   ├── UserController.java
+│   │   ├── UserService.java
+│   │   └── .module-knowledge.ttl    # Module-specific RDF knowledge
+│   ├── auth-module/
+│   │   ├── AuthController.java
+│   │   ├── TokenService.java
+│   │   └── .module-knowledge.ttl    # Module-specific RDF knowledge
+│   └── data-layer/
+│       ├── UserRepository.java
+│       ├── DatabaseConfig.java
+│       └── .module-knowledge.ttl    # Module-specific RDF knowledge
+├── .aaswe/                          # AASWE metadata directory
+│   ├── versions.json                # Version metadata
+│   └── config.json                  # AASWE configuration
 
-class EntityType(Enum):
-    FILE = "File"
-    CLASS = "Class"
-    METHOD = "Method"
-    VARIABLE = "Variable"
-    INTERFACE = "Interface"
-    COMPONENT = "Component"
-
-class CodeEntity(BaseModel):
-    id: str
-    type: EntityType
-    name: str
-    file_path: str
-    line_number: Optional[int]
-    properties: Dict[str, any]
-    summary: Optional[str]
-    complexity_score: Optional[float]
-
-class Relationship(BaseModel):
-    source_id: str
-    target_id: str
-    type: str
-    properties: Dict[str, any]
-    confidence_score: float
-
-class AnalysisResult(BaseModel):
-    entities: List[CodeEntity]
-    relationships: List[Relationship]
-    patterns: List[Pattern]
-    issues: List[Issue]
-    metrics: Dict[str, float]
+ai-software-engineering-system/     # The AI system itself
+├── schemas/
+│   └── code-ontology.ttl           # RDF ontology definition
+├── schemas/
+│   └── code-ontology.ttl     # RDF ontology definition
+├── app/
+│   ├── services/
+│   │   ├── ingestion/
+│   │   │   ├── code_ingestion.py
+│   │   │   ├── ast_analyzer.py
+│   │   │   └── webhook_handler.py
+│   │   ├── knowledge/
+│   │   │   ├── rdf_generator.py
+│   │   │   ├── version_manager.py
+│   │   │   ├── hybrid_storage.py
+│   │   │   └── neo4j_manager.py
+│   │   ├── ai/
+│   │   │   ├── crew_orchestrator.py
+│   │   │   ├── langchain_rag.py
+│   │   │   ├── llm_gateway.py
+│   │   │   └── reasoning_engine.py
+│   │   ├── generation/
+│   │   │   ├── doc_generator.py
+│   │   │   ├── test_generator.py
+│   │   │   ├── ticket_generator.py
+│   │   │   └── refactoring_advisor.py
+│   │   └── integration/
+│   │       ├── api_gateway.py
+│   │       ├── auth_service.py
+│   │       ├── mcp_server.py
+│   │       └── monitoring.py
+├── web/                       # React frontend
+├── docker-compose.local.yml   # Local development
+├── docker-compose.cloud.yml   # Cloud deployment
+└── kubernetes/               # K8s manifests
 ```
 
-### Workflow Models
+### Configuration Models
 
-```python
-class WorkflowTask(BaseModel):
-    id: str
-    type: str
-    description: str
-    agent_role: str
-    inputs: Dict[str, any]
-    outputs: Dict[str, any]
-    status: str
-    created_at: datetime
-    completed_at: Optional[datetime]
-
-class AgentDefinition(BaseModel):
-    role: str
-    goal: str
-    backstory: str
-    tools: List[str]
-    allow_delegation: bool
-    memory_enabled: bool
+```yaml
+# .aaswe/config.json
+{
+  "project": {
+    "name": "example-project",
+    "description": "Example software project",
+    "main_language": "java",
+    "supported_languages": ["java", "javascript", "python"]
+  },
+  "analysis": {
+    "enabled": true,
+    "incremental": true,
+    "exclude_paths": ["node_modules/", "target/", "build/"],
+    "complexity_threshold": 10,
+    "coverage_threshold": 80
+  },
+  "storage": {
+    "neo4j": {
+      "uri": "bolt://localhost:7687",
+      "auth": ["neo4j", "password"]
+    },
+    "rdf": {
+      "base_path": ".aaswe/rdf",
+      "format": "turtle"
+    }
+  },
+  "ai": {
+    "llm_provider": "openai",
+    "model": "gpt-4",
+    "temperature": 0.1,
+    "max_tokens": 4000
+  },
+  "integrations": {
+    "jira": {
+      "enabled": true,
+      "project_key": "PROJ",
+      "auto_assign": true
+    },
+    "confluence": {
+      "enabled": true,
+      "space_key": "PROJ",
+      "auto_publish": true
+    }
+  }
+}
 ```
 
 ## Error Handling
 
 ### Error Categories and Strategies
 
-#### 1. Code Analysis Errors
-- **Parsing Failures**: Graceful degradation with partial analysis
-- **Language Support**: Clear error messages for unsupported languages
-- **Large File Handling**: Chunking and streaming for large codebases
+#### 1. Data Ingestion Errors
 
-#### 2. Graph Database Errors
-- **Connection Issues**: Automatic retry with exponential backoff
-- **Schema Violations**: Validation before insertion with detailed error reporting
-- **Performance Issues**: Query optimization and caching strategies
+**Code Parsing Failures**
+- **Strategy**: Graceful degradation with partial analysis
+- **Recovery**: Skip problematic files, log errors, continue processing
+- **Notification**: Alert developers about parsing issues
 
-#### 3. LLM Integration Errors
-- **Rate Limiting**: Queue management and request throttling
-- **Model Failures**: Fallback to alternative models or cached responses
-- **Context Window Limits**: Intelligent context truncation and summarization
+**Repository Access Errors**
+- **Strategy**: Retry with exponential backoff
+- **Recovery**: Use cached data if available
+- **Notification**: System administrators notified
 
-#### 4. Multi-Agent Workflow Errors
-- **Agent Communication**: Timeout handling and retry mechanisms
-- **Task Failures**: Automatic task reassignment and error escalation
-- **Resource Conflicts**: Coordination mechanisms and resource locking
+#### 2. Knowledge Graph Errors
 
-### Error Recovery Mechanisms
+**Neo4j Connection Failures**
+- **Strategy**: Failover to read-only mode using RDF files
+- **Recovery**: Automatic reconnection attempts
+- **Notification**: Operations team alerted
+
+**RDF Generation Errors**
+- **Strategy**: Fallback to previous version
+- **Recovery**: Regenerate from AST data
+- **Notification**: Development team notified
+
+#### 3. AI/LLM Errors
+
+**LLM API Failures**
+- **Strategy**: Multi-provider failover (OpenAI → Anthropic → Local)
+- **Recovery**: Cached responses for common queries
+- **Notification**: Rate limiting and cost alerts
+
+**Agent Orchestration Errors**
+- **Strategy**: Task redistribution to available agents
+- **Recovery**: Simplified single-agent fallback
+- **Notification**: Performance degradation alerts
+
+#### 4. Integration Errors
+
+**CI/CD Pipeline Failures**
+- **Strategy**: Non-blocking analysis with delayed reporting
+- **Recovery**: Manual trigger options
+- **Notification**: Build status updates
+
+**External System Failures**
+- **Strategy**: Queue operations for retry
+- **Recovery**: Manual intervention options
+- **Notification**: Integration status dashboard
+
+### Error Handling Implementation
 
 ```python
 class ErrorHandler:
-    def handle_analysis_error(self, error: AnalysisError) -> RecoveryAction
-    def handle_graph_error(self, error: GraphError) -> RecoveryAction
-    def handle_llm_error(self, error: LLMError) -> RecoveryAction
-    def handle_workflow_error(self, error: WorkflowError) -> RecoveryAction
-
-class RecoveryAction(BaseModel):
-    action_type: str
-    retry_count: int
-    fallback_strategy: Optional[str]
-    escalation_required: bool
+    def __init__(self):
+        self.retry_strategies = {
+            'network': ExponentialBackoff(max_retries=3),
+            'api': LinearBackoff(max_retries=5),
+            'database': CircuitBreaker(failure_threshold=5)
+        }
+    
+    def handle_error(self, error_type: str, error: Exception, context: Dict):
+        strategy = self.retry_strategies.get(error_type)
+        
+        if strategy and strategy.should_retry():
+            return strategy.retry(context['operation'])
+        
+        # Fallback strategies
+        if error_type == 'llm_api':
+            return self.fallback_to_alternative_provider(context)
+        elif error_type == 'neo4j':
+            return self.fallback_to_rdf_query(context)
+        
+        # Log and notify
+        self.log_error(error_type, error, context)
+        self.notify_stakeholders(error_type, error, context)
+        
+        return None
 ```
 
 ## Testing Strategy
 
-### Unit Testing
-- **Component Isolation**: Mock external dependencies (Neo4j, LLMs, APIs)
-- **Test Coverage**: Minimum 80% code coverage for core components
-- **Property-Based Testing**: Use Hypothesis for complex data transformations
+### Testing Pyramid
 
-### Integration Testing
-- **Graph Database**: Test schema migrations and query performance
-- **LLM Integration**: Test with mock LLM responses and real API calls
-- **Multi-Agent Workflows**: Test agent coordination and task delegation
+#### 1. Unit Tests (70%)
 
-### End-to-End Testing
-- **Full Pipeline**: Test complete workflows from code ingestion to artifact generation
-- **Performance Testing**: Load testing with realistic codebases
-- **Regression Testing**: Automated testing of core functionality
+**Code Analysis Components**
+- AST parser accuracy for different languages
+- RDF generation correctness
+- Version management operations
+- Storage layer operations
 
-### Testing Infrastructure
+**AI Components**
+- Agent behavior and decision making
+- LLM integration and response handling
+- Query translation accuracy
+- Reasoning engine logic
+
+#### 2. Integration Tests (20%)
+
+**System Integration**
+- End-to-end code analysis pipeline
+- Knowledge graph construction and querying
+- Multi-agent collaboration workflows
+- External system integrations (Jira, Confluence)
+
+**API Integration**
+- REST API endpoint functionality
+- GraphQL query execution
+- Authentication and authorization
+- Rate limiting and error handling
+
+#### 3. End-to-End Tests (10%)
+
+**User Workflows**
+- Complete project onboarding process
+- Natural language query to results
+- Documentation generation pipeline
+- Test generation and validation
+
+**Performance Tests**
+- Large codebase analysis performance
+- Concurrent user load testing
+- Knowledge graph query performance
+- Memory and resource usage
+
+### Test Implementation Strategy
 
 ```python
-class TestInfrastructure:
-    def setup_test_graph_db(self) -> Neo4jTestInstance
-    def create_mock_llm_service(self) -> MockLLMService
-    def setup_test_repositories(self) -> List[TestRepository]
-    def run_performance_benchmarks(self) -> BenchmarkResults
+# Unit Test Example
+class TestRDFGenerator(unittest.TestCase):
+    def setUp(self):
+        self.generator = RDFGenerator()
+        self.sample_module = {
+            'name': 'UserService',
+            'classes': [{
+                'name': 'UserController',
+                'methods': [{
+                    'name': 'createUser',
+                    'complexity': 5
+                }]
+            }]
+        }
+    
+    def test_generate_module_rdf(self):
+        rdf_content = self.generator.generate_module_rdf(
+            self.sample_module, 'v1.0.0'
+        )
+        
+        # Validate RDF structure
+        graph = Graph()
+        graph.parse(data=rdf_content, format='turtle')
+        
+        # Assert expected triples exist
+        self.assertTrue(self.has_triple(graph, 'UserService', 'rdf:type', 'aaswe:Module'))
+        self.assertTrue(self.has_triple(graph, 'UserController', 'rdf:type', 'aaswe:Class'))
+
+# Integration Test Example
+class TestAnalysisPipeline(unittest.TestCase):
+    def test_end_to_end_analysis(self):
+        # Setup test repository
+        test_repo = self.create_test_repository()
+        
+        # Trigger analysis
+        result = self.analysis_service.analyze_repository(test_repo.path)
+        
+        # Verify knowledge graph creation
+        self.assertIsNotNone(result.knowledge_graph)
+        self.assertGreater(len(result.modules), 0)
+        
+        # Verify RDF generation
+        rdf_files = self.get_rdf_files(test_repo.path)
+        self.assertGreater(len(rdf_files), 0)
+        
+        # Verify Neo4j population
+        with self.neo4j_driver.session() as session:
+            result = session.run("MATCH (n) RETURN count(n) as count")
+            self.assertGreater(result.single()['count'], 0)
 ```
 
-## Security Considerations
+### Continuous Testing
 
-### Authentication and Authorization
-- **Enterprise SSO**: Integration with SAML/OIDC providers
-- **Role-Based Access Control**: Fine-grained permissions for graph access
-- **API Security**: JWT tokens with proper validation and expiration
-
-### Data Protection
-- **Sensitive Data Detection**: Automatic PII identification and masking
-- **Encryption**: At-rest and in-transit encryption for all data
-- **Audit Logging**: Comprehensive audit trails for all system interactions
-
-### Code Security
-- **Vulnerability Scanning**: Integration with security scanning tools
-- **Dependency Analysis**: Automated dependency vulnerability detection
-- **Secure Coding**: Security-focused code analysis and recommendations
-
-### Compliance
-- **GDPR Compliance**: Data retention policies and right to deletion
-- **SOC 2**: Security controls and monitoring
-- **Industry Standards**: Compliance with relevant industry regulations
-
-## Performance Optimization
-
-### Graph Database Optimization
-- **Index Strategy**: Optimized indexes for common query patterns
-- **Query Optimization**: Cypher query performance tuning
-- **Clustering**: Multi-node Neo4j clusters for high availability
-
-### LLM Performance
-- **Caching**: Intelligent caching of LLM responses
-- **Batch Processing**: Batch API calls for efficiency
-- **Model Selection**: Optimal model selection based on task requirements
-
-### Scalability Patterns
-- **Horizontal Scaling**: Microservices architecture with load balancing
-- **Async Processing**: Message queues for long-running tasks
-- **Resource Management**: Dynamic resource allocation based on workload
-
-## Deployment Architecture
-
-### Container Strategy
 ```yaml
-# Docker Compose example for development
-version: '3.8'
-services:
-  neo4j:
-    image: neo4j:5.15-enterprise
-    environment:
-      NEO4J_AUTH: neo4j/password
-      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
-    
-  api-gateway:
-    image: kong:3.4
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
-    
-  orchestration-engine:
-    build: ./services/orchestration
-    environment:
-      NEO4J_URI: bolt://neo4j:7687
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-    
-  documentation-generator:
-    build: ./services/documentation
-    volumes:
-      - ./output:/app/output
+# GitHub Actions CI/CD
+name: AI System Tests
+on: [push, pull_request]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+      - name: Run unit tests
+        run: pytest tests/unit/ --cov=app --cov-report=xml
+      
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5.15-community
+        env:
+          NEO4J_AUTH: neo4j/test123
+        ports:
+          - 7687:7687
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run integration tests
+        run: pytest tests/integration/
+        
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup test environment
+        run: docker-compose -f docker-compose.test.yml up -d
+      - name: Run E2E tests
+        run: pytest tests/e2e/
+      - name: Cleanup
+        run: docker-compose -f docker-compose.test.yml down
 ```
 
-### Kubernetes Deployment
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ai-software-engineering-system
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: ai-software-engineering
-  template:
-    metadata:
-      labels:
-        app: ai-software-engineering
-    spec:
-      containers:
-      - name: orchestration-engine
-        image: ai-software-engineering/orchestration:latest
-        resources:
-          requests:
-            memory: "2Gi"
-            cpu: "1000m"
-          limits:
-            memory: "4Gi"
-            cpu: "2000m"
-```
-
-This design provides a comprehensive, scalable, and maintainable architecture for the AI-assisted software engineering system, leveraging best-in-class technologies and patterns for enterprise deployment.
+This comprehensive design provides a robust foundation for implementing the AI-Assisted Software Engineering System with clear architectural boundaries, well-defined interfaces, comprehensive error handling, and thorough testing strategies.
