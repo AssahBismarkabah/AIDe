@@ -132,20 +132,20 @@ The system follows a 5-layer architecture with versioned knowledge graphs, multi
 4. WHEN requesting code assistance THEN the system SHALL provide real-time code analysis and suggestions
 5. WHEN generating artifacts THEN the system SHALL integrate generated content directly into the IDE
 
-### Requirement 11: CLI Tool and Developer Workflow Integration
+### Requirement 11: NPM Package Integration and LLM Enhancement
 
-**User Story:** As a developer, I want to install the AI system as a binary on my machine and interact with it via CLI commands, so that I can easily use it in any codebase for code modifications, implementation, refactoring, documentation, testing, and CI integration.
+**User Story:** As a developer, I want to install an npm package in my project that enhances LLM interactions with deep codebase knowledge, so that when I use AI assistants in my IDE, they have comprehensive understanding of my codebase structure and patterns.
 
 #### Acceptance Criteria
 
-1. WHEN I install the binary THEN the system SHALL be available as a `aaswe` command-line tool
-2. WHEN I run `aaswe init` in a codebase THEN the system SHALL initialize the project with configuration and generate initial RDF files
-3. WHEN I run `aaswe ask "question"` THEN the system SHALL provide intelligent responses using knowledge of the codebase
-4. WHEN I run `aaswe implement "feature description"` THEN the system SHALL generate and modify code to implement the requested feature
-5. WHEN I run `aaswe refactor "component"` THEN the system SHALL intelligently refactor the specified component
-6. WHEN I run `aaswe document "component"` THEN the system SHALL generate documentation and optionally push to Confluence
-7. WHEN I run `aaswe test "component"` THEN the system SHALL generate tests for the specified component
-8. WHEN I run `aaswe integrate` THEN the system SHALL set up CI/CD integration and push architectural documents to Jira/Confluence
+1. WHEN I run `npm install @aaswe/codebase-ai` THEN the package SHALL be installed and automatically analyze my codebase
+2. WHEN the package is installed THEN it SHALL generate initial `.module-knowledge.ttl` files with concrete code information
+3. WHEN I interact with LLMs in my IDE THEN the package SHALL provide relevant codebase context through MCP or IDE extensions
+4. WHEN I ask an LLM to implement features THEN the system SHALL provide the LLM with existing patterns and architectural context
+5. WHEN I request refactoring THEN the system SHALL give the LLM dependency information and impact analysis
+6. WHEN I ask for documentation THEN the system SHALL provide architectural relationships and business context
+7. WHEN I request tests THEN the system SHALL provide code structure and testing patterns to the LLM
+8. WHEN code changes occur THEN the system SHALL automatically update the knowledge graph and RDF files
 
 ### Requirement 12: Scalability and Performance
 

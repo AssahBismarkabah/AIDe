@@ -393,16 +393,17 @@ test_engineer = Agent(
 )
 ```
 
-## Binary Tool Deployment Architecture
+## NPM Package Deployment Architecture
 
 ### Local Service Management
 
-Since the tool is distributed as a binary (`aaswe`), all services from the 5-layer architecture must run locally on the user's machine. The binary handles service lifecycle management automatically:
+Since the tool is distributed as an npm package (`@aaswe/codebase-ai`), all services from the 5-layer architecture run locally as background services. The package handles service lifecycle management automatically when installed in a project:
 
-#### Embedded Services Approach (Recommended)
+#### NPM Package Architecture (Recommended)
 
 ```yaml
-aaswe-binary-architecture:
+npm-package-architecture:
+  package-name: "@aaswe/codebase-ai"
   embedded-components:
     # Layer 1: Data Ingestion & Analysis
     ast-parsers: "Built-in parsers for Java, Python, JavaScript, etc."
@@ -429,27 +430,24 @@ aaswe-binary-architecture:
 
   initialization-process:
     install: |
-      # User installs binary (single executable)
-      curl -sSL https://install.aaswe.dev | sh
-      # or: brew install aaswe
-      # or: Download from GitHub releases
+      # User installs npm package in their project
+      npm install @aaswe/codebase-ai
+      # Package automatically analyzes codebase on install
+      # Generates .module-knowledge.ttl files
+      # Sets up MCP server for IDE integration
     
     first-run: |
-      # Binary auto-initializes on first execution
-      aaswe --version
-      # Creates ~/.aaswe/ directory
+      # Package auto-initializes on first execution
+      # Creates node_modules/.aaswe/ directory
       # Downloads required models/dependencies
       # Initializes embedded Neo4j database
       # Sets up default configuration
     
-    project-setup: |
-      # Initialize in existing codebase
-      cd /path/to/project
-      aaswe init
-      # Analyzes codebase structure
-      # Generates .module-knowledge.ttl files
-      # Creates .aaswe/config.json
-      # Populates local knowledge graph
+    ide-integration: |
+      # IDE detects MCP server automatically
+      # LLM interactions enhanced with codebase context
+      # Real-time knowledge graph updates
+      # Seamless developer experience
 ```
 
 #### Service Lifecycle Management

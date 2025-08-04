@@ -321,56 +321,56 @@ This implementation plan converts the AI-Assisted Software Engineering System de
     - Write test automation and continuous testing pipeline
     - _Requirements: 11.1, 11.2, 11.4_
 
-- [ ] 12. Implement CLI Interface and Developer Workflow
+- [ ] 12. Implement NPM Package and LLM Enhancement System
 
-  - [ ] 12.1 Build Core CLI Framework
+  - [ ] 12.1 Build NPM Package Framework
 
-    - Implement `aaswe` command-line interface using Click or Typer framework
-    - Create command structure with subcommands (init, ask, implement, refactor, document, test, integrate)
-    - Build configuration management for CLI settings and preferences
-    - Implement progress indicators and user-friendly output formatting
-    - Add help system and command documentation
-    - Write unit tests for CLI command parsing and execution
+    - Create npm package structure with proper entry points and dependencies
+    - Implement automatic project detection and initialization when package is installed via npm
+    - Build background service management that starts when package is imported
+    - Create package configuration and settings management in node_modules/.aaswe/
+    - Implement automatic codebase analysis on npm install with postinstall scripts
+    - Write unit tests for package lifecycle and service management
     - _Requirements: 11.1, 11.2_
 
-  - [ ] 12.2 Implement Project Initialization Commands
+  - [ ] 12.2 Implement Automatic Project Analysis and RDF Generation
 
-    - Build `aaswe init` command to initialize projects with configuration
+    - Build system to automatically analyze codebase when npm package is installed
     - Create system to generate initial `.module-knowledge.ttl` files containing concrete, real information extracted from existing codebases
     - Implement project structure analysis and module detection to identify actual code modules
-    - Add configuration wizard for project-specific settings
     - Generate concrete RDF files with actual class names, method signatures, dependencies, and relationships from the analyzed code
-    - Write integration tests for project initialization workflows with real codebase scenarios
-    - _Requirements: 11.2, 11.3_
+    - Build automatic knowledge graph population from generated RDF files
+    - Write integration tests for automatic analysis workflows with real codebase scenarios
+    - _Requirements: 11.2, 11.8_
 
-  - [ ] 12.3 Build Interactive Query and Implementation Commands
+  - [ ] 12.3 Build MCP Server for IDE Integration
 
-    - Implement `aaswe ask "question"` command for natural language queries
-    - Create `aaswe implement "feature description"` command for code generation
-    - Build `aaswe refactor "component"` command for intelligent refactoring
-    - Implement interactive mode for complex multi-step operations
-    - Add context-aware suggestions and auto-completion
-    - Write unit tests for query processing and code generation commands
-    - _Requirements: 11.4, 11.5, 11.6_
+    - Implement Model Context Protocol server that starts with npm package
+    - Create MCP tools that provide codebase context to LLM interactions in IDEs
+    - Build intelligent context selection based on current file, cursor position, and query intent
+    - Implement real-time knowledge graph querying for LLM context enhancement
+    - Add system to help LLM understand project patterns, conventions, and architecture
+    - Write unit tests for MCP server functionality and context enhancement accuracy
+    - _Requirements: 11.3, 11.4, 11.5_
 
-  - [ ] 12.4 Create Documentation and Testing Commands
+  - [ ] 12.4 Create LLM Context Enhancement System
 
-    - Build `aaswe document "component"` command for documentation generation
-    - Implement `aaswe test "component"` command for test generation
-    - Create integration with external documentation systems (Confluence)
-    - Add support for different documentation formats and templates
-    - Implement test framework detection and appropriate test generation
-    - Write integration tests for documentation and test generation workflows
+    - Build system to provide LLM with codebase context through MCP protocol
+    - Implement dependency tracking and architectural information for LLM interactions
+    - Create system to provide LLM with project-specific patterns and best practices
+    - Build code quality validation and improvement suggestions for LLM outputs
+    - Implement multi-file change coordination when LLM modifies related components
+    - Write integration tests for LLM-assisted code generation and modification workflows
+    - _Requirements: 11.3, 11.4, 11.6_
+
+  - [ ] 12.5 Implement Knowledge Graph Auto-Update System
+    - Build system to automatically detect code changes and update knowledge graph
+    - Create incremental RDF file updates when code is modified
+    - Implement automatic sync between code changes and `.module-knowledge.ttl` files
+    - Build conflict resolution for concurrent knowledge updates
+    - Add system to preserve developer-enhanced RDF content during automatic updates
+    - Write integration tests for automatic knowledge synchronization scenarios
     - _Requirements: 11.7, 11.8_
-
-  - [ ] 12.5 Implement CI/CD Integration Commands
-    - Build `aaswe integrate` command for CI/CD setup and configuration
-    - Create system to push architectural documents to Jira and Confluence
-    - Implement webhook configuration for automated analysis
-    - Add support for different CI/CD platforms (GitHub Actions, Jenkins, GitLab CI)
-    - Create templates for common CI/CD integration patterns
-    - Write integration tests for CI/CD setup and external system integration
-    - _Requirements: 11.8_
 
 - [ ] 13. Implement Testing and Quality Assurance
 

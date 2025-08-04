@@ -4,7 +4,7 @@
 
 ## Overview
 
-The AI-Assisted Software Engineering System (AASWE) is a revolutionary developer tool that transforms traditional software development workflows by creating a "digital twin" of software systems through versioned knowledge graphs. The system provides AI-powered code implementation, refactoring, documentation, and architectural guidance using deep understanding of codebase structure and relationships.
+The AI-Assisted Software Engineering System (AASWE) is an **npm package** that enhances LLM interactions in your IDE with deep codebase knowledge. Install it in your project, and when you interact with AI assistants in your IDE, they'll have comprehensive understanding of your codebase structure, patterns, and relationships - enabling much more intelligent code implementation, refactoring, and architectural guidance.
 
 ## Key Features
 
@@ -26,10 +26,10 @@ The AI-Assisted Software Engineering System (AASWE) is a revolutionary developer
 - **Implementation Requests**: Request feature implementations through natural language descriptions
 - **Documentation Assistance**: Generate documentation on-demand when requested
 
-### 🔧 **Developer-Friendly CLI Tool**
-- **Simple Installation**: Single binary installation with automatic setup
-- **Intuitive Commands**: Easy-to-use CLI interface for all operations
-- **IDE Integration**: Native plugins for IntelliJ IDEA and VS Code
+### 🔧 **Developer-Friendly NPM Package**
+- **Simple Installation**: `npm install @aaswe/codebase-ai` with automatic setup
+- **IDE Integration**: Seamless integration with IntelliJ IDEA and VS Code through MCP
+- **LLM Enhancement**: Enhances existing LLM interactions with codebase context
 - **Local-First**: Works offline with embedded services
 
 ### 📊 **Collaborative Knowledge Enhancement**
@@ -81,59 +81,77 @@ The system follows a **5-layer architecture** optimized for scalability, develop
 ### Quick Start
 
 ```bash
-# Install the AASWE binary
-curl -sSL https://install.aaswe.dev | sh
+# Install the AASWE npm package in your project
+npm install @aaswe/codebase-ai
 
-# Or using Homebrew
-brew install aaswe
+# Or using yarn
+yarn add @aaswe/codebase-ai
 
-# Or download from GitHub releases
-# https://github.com/your-org/aaswe/releases
+# Or using pnpm
+pnpm add @aaswe/codebase-ai
 ```
 
-### First Run Setup
+### Automatic Setup
 
 ```bash
-# Initialize AASWE (creates ~/.aaswe/ directory and sets up services)
-aaswe --version
+# The package automatically analyzes your codebase on installation
+# Creates .module-knowledge.ttl files in each module
+# Sets up MCP server for IDE integration
+# Initializes local knowledge graph
 
-# Navigate to your project and initialize
-cd /path/to/your/project
-aaswe init
+# Your IDE will automatically detect the enhanced LLM capabilities
+# Start using AI assistants with deep codebase knowledge immediately
 ```
 
 ## Usage
 
-### Basic Commands
+### Enhanced LLM Interactions
 
-```bash
-# Initialize a project (analyzes codebase and generates RDF files)
-aaswe init
+Once installed, the package automatically enhances your IDE's LLM interactions with deep codebase knowledge:
 
-# Ask questions about your codebase
-aaswe ask "What are the main architectural components?"
-aaswe ask "Show me all classes that implement UserService"
-aaswe ask "How does authentication work in this system?"
+```javascript
+// In your IDE, when you interact with AI assistants, they now have access to:
 
-# Implement new features
-aaswe implement "Add user registration endpoint with email validation"
-aaswe implement "Create a caching layer for database queries"
+// 1. Ask questions about your codebase
+"What are the main architectural components in this project?"
+"Show me all classes that implement UserService"
+"How does authentication work in this system?"
 
-# Refactor code intelligently
-aaswe refactor "UserController"
-aaswe refactor "Extract common validation logic into utility class"
+// 2. Request feature implementations with context
+"Add user registration endpoint with email validation that follows our existing patterns"
+"Create a caching layer for database queries using our current architecture"
 
-# Generate documentation
-aaswe document "UserService"
-aaswe document "API endpoints" --format confluence
+// 3. Get intelligent refactoring suggestions
+"Refactor UserController to follow our established patterns"
+"Extract common validation logic into utility class while maintaining dependencies"
 
-# Generate tests
-aaswe test "UserController.createUser"
-aaswe test "AuthenticationService" --framework junit
+// 4. Generate contextual documentation
+"Document the UserService class with architectural context"
+"Generate API documentation that explains the relationships between endpoints"
 
-# Set up CI/CD integration
-aaswe integrate --platform github-actions
-aaswe integrate --push-docs confluence --push-tickets jira
+// 5. Create appropriate tests
+"Generate unit tests for UserController.createUser that cover our edge cases"
+"Create integration tests for AuthenticationService using our testing patterns"
+```
+
+### IDE Integration Examples
+
+**IntelliJ IDEA with GitHub Copilot:**
+```
+You: "Implement a new payment service that integrates with our existing user system"
+
+AI (enhanced with AASWE): "I can see your project uses hexagonal architecture with UserService 
+following the repository pattern. I'll create a PaymentService that integrates with your 
+existing UserRepository and follows your established error handling patterns..."
+```
+
+**VS Code with Claude:**
+```
+You: "Refactor this method to be more maintainable"
+
+AI (enhanced with AASWE): "Based on your codebase patterns, I can see you prefer dependency 
+injection and have established logging patterns. Here's a refactored version that follows 
+your project's conventions and updates all dependent classes..."
 ```
 
 ### Working with Knowledge Files
