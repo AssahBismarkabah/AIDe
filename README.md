@@ -25,9 +25,9 @@ aide start
 
 ## Architecture
 
-```
+
  ![High-Level System Architecture](main/docs/v1/localdep.png)
-```
+
 
 ## Installation
 
