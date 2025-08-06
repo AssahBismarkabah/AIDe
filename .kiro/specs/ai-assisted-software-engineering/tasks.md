@@ -2,7 +2,16 @@
 
 ## Overview
 
-This implementation plan converts the AI-Assisted Software Engineering System design into a series of actionable coding tasks. The plan follows a test-driven, incremental approach that builds the system layer by layer, ensuring each component integrates properly with the overall architecture. The focus is on creating a developer tool that can implement code changes and features using deep knowledge of codebases through versioned knowledge graphs.
+This implementation plan converts the AI-Assisted Software Engineering System design into a series of actionable coding tasks. The plan follows a test-driven, incremental approach that builds the system layer by layer, ensuring each component integrates properly with the overall architecture. The focus is on creating a local Docker-based developer tool that enhances IDE LLMs with deep codebase knowledge through `.module-knowledge.ttl` files that serve dual purposes: populating knowledge graphs and providing direct LLM context enhancement.
+
+## Architecture Overview
+
+The system uses a **local Docker-based 5-layer architecture** where:
+- **Neo4j knowledge graph** is the primary knowledge source populated directly from AST analysis for complex relationship queries
+- **`.module-knowledge.ttl` files** serve as enhancement layer containing developer-added business context and architectural insights
+- **MCP server** combines Neo4j structural data with TTL business context to provide comprehensive LLM understanding
+- **All services run locally** via Docker Compose, avoiding cloud deployment complexity
+- **Developers enhance TTL files** with business context that supplements the core Neo4j structural data
 
 ## Implementation Tasks
 
@@ -27,17 +36,18 @@ This implementation plan converts the AI-Assisted Software Engineering System de
     - Write comprehensive unit tests for each language parser
     - _Requirements: 1.1, 1.2, 1.6_
 
-  - [ ] 2.2 Build RDF Generator for distributed module knowledge representation
+  - [ ] 2.2 Build RDF Generator for distributed module knowledge representation and LLM enhancement
 
     - Implement RDF generation from AST data using RDFLib for each codebase module
     - Create `.module-knowledge.ttl` files within each module directory with concrete, real information extracted from the actual code
     - Extract and represent actual classes, methods, dependencies, complexity metrics, and architectural patterns from the ingested code
-    - Design RDF ontology schema that captures comprehensive code structure, relationships, and business context
-    - Generate initial RDF files containing concrete module definitions, not templates - real class names, method signatures, dependencies, and relationships
+    - Design RDF ontology schema that captures comprehensive code structure, relationships, and business context optimized for both Neo4j ingestion and direct LLM consumption
+    - Generate initial RDF files containing concrete module definitions with rich descriptions suitable for LLM context - real class names, method signatures, dependencies, relationships, and human-readable documentation
+    - Include business context placeholders and examples in TTL files to guide developer enhancement
     - Create validation system for RDF syntax and consistency across distributed files
-    - Build system to detect and sync RDF file updates back to knowledge graph
-    - Write unit tests for RDF generation accuracy, validation, and distributed file management
-    - _Requirements: 1.3, 1.4_
+    - Build system to detect and sync RDF file updates back to knowledge graph AND update MCP server context
+    - Write unit tests for RDF generation accuracy, validation, distributed file management, and LLM context formatting
+    - _Requirements: 1.3, 1.4, 11.3, 11.4_
 
   - [ ] 2.3 Develop Code Ingestion Service with Git integration
 
@@ -50,15 +60,17 @@ This implementation plan converts the AI-Assisted Software Engineering System de
     - Write integration tests for Git workflow scenarios and RDF file synchronization
     - _Requirements: 1.1, 1.5_
 
-  - [ ] 2.4 Build Module Knowledge Management System
-    - Implement system to generate initial `.module-knowledge.ttl` files containing concrete, real information extracted from existing codebases
-    - Create developer-friendly documentation and examples showing how to enhance RDF files with additional business context
+  - [ ] 2.4 Build Module Knowledge Management System for dual-purpose TTL files
+
+    - Implement system to generate initial `.module-knowledge.ttl` files containing concrete, real information extracted from existing codebases with rich descriptions for LLM consumption
+    - Create developer-friendly documentation and examples showing how to enhance RDF files with business context that improves both graph queries and LLM understanding
     - Build validation system to ensure RDF files maintain proper syntax when manually edited by developers
-    - Implement automatic knowledge graph updates when RDF files are modified by developers
+    - Implement automatic knowledge graph updates AND MCP server context refresh when RDF files are modified by developers
     - Create conflict resolution system for concurrent RDF file updates
-    - Add tooling to help developers understand and enhance the concrete module knowledge already extracted from their code
-    - Write unit tests for RDF file management and developer workflow scenarios
-    - _Requirements: 1.3, 1.4, 1.5_
+    - Add tooling to help developers understand and enhance the concrete module knowledge, showing how changes affect both graph data and LLM context
+    - Build preview system showing developers how their TTL enhancements will appear to LLMs
+    - Write unit tests for RDF file management, developer workflow scenarios, and dual-purpose functionality
+    - _Requirements: 1.3, 1.4, 1.5, 11.3, 11.4_
 
 - [ ] 3. Implement Layer 2: Versioned Knowledge Graph Core
 
@@ -66,7 +78,7 @@ This implementation plan converts the AI-Assisted Software Engineering System de
 
     - Implement Neo4j connection management and configuration
     - Create graph schema with constraints and indexes for performance
-    - Build data ingestion pipeline from RDF to Neo4j
+    - Build data ingestion pipeline from `.module-knowledge.ttl` files to Neo4j
     - Implement Cypher query optimization and caching
     - Add support for APOC procedures and graph algorithms
     - Write unit tests for database operations and schema validation
@@ -93,14 +105,17 @@ This implementation plan converts the AI-Assisted Software Engineering System de
     - Write integration tests for storage coordination scenarios
     - _Requirements: 11.4, 11.5_
 
-  - [ ] 3.4 Create In-Memory RDF Store for fast LLM queries
-    - Implement RDFLib-based in-memory graph storage
-    - Build SPARQL query execution engine
-    - Create real-time knowledge graph update mechanisms
-    - Implement memory management and garbage collection
-    - Add performance monitoring and optimization
-    - Write unit tests for in-memory operations and SPARQL queries
-    - _Requirements: 2.2, 11.1_
+  - [ ] 3.4 Create In-Memory RDF Store for fast LLM queries and MCP context
+
+    - Implement RDFLib-based in-memory graph storage loaded from `.module-knowledge.ttl` files
+    - Build SPARQL query execution engine for complex knowledge retrieval
+    - Create real-time knowledge graph update mechanisms when TTL files change
+    - Implement direct TTL content serving for MCP server context enhancement
+    - Build intelligent context selection based on query relevance and file proximity
+    - Implement memory management and garbage collection for large codebases
+    - Add performance monitoring and optimization for both graph queries and LLM context serving
+    - Write unit tests for in-memory operations, SPARQL queries, and MCP context generation
+    - _Requirements: 2.2, 11.1, 11.3, 11.4_
 
 - [ ] 4. Implement Layer 3: AI/LLM Integration & Reasoning
 
@@ -248,14 +263,18 @@ This implementation plan converts the AI-Assisted Software Engineering System de
     - Write unit tests for authentication and authorization scenarios
     - _Requirements: 9.1, 9.4_
 
-  - [ ] 8.3 Develop MCP Server for IDE integration
-    - Implement Model Context Protocol server for IDE integration
-    - Create tools for code analysis and generation in IDEs
-    - Build IntelliJ IDEA and VS Code extension support
-    - Implement real-time developer assistance capabilities
-    - Add IDE-specific optimization and performance tuning
-    - Write integration tests for IDE functionality and user experience
-    - _Requirements: 10.1, 10.2, 10.4_
+  - [ ] 8.3 Develop MCP Server for IDE integration with TTL-based context enhancement
+
+    - Implement Model Context Protocol server that serves `.module-knowledge.ttl` content directly to IDE LLMs
+    - Create tools for code analysis and generation that leverage both Neo4j graph data and raw TTL descriptions
+    - Build intelligent context selection that combines relevant TTL files based on current file, cursor position, and query intent
+    - Implement real-time TTL file monitoring to update LLM context when developers enhance knowledge files
+    - Build IntelliJ IDEA and VS Code extension support with TTL-aware context injection
+    - Create context formatting that presents TTL business descriptions in LLM-friendly format
+    - Add IDE-specific optimization for context size and relevance scoring
+    - Implement preview functionality showing developers how their TTL enhancements affect LLM context
+    - Write integration tests for IDE functionality, TTL context serving, and user experience
+    - _Requirements: 10.1, 10.2, 10.4, 11.3, 11.4_
 
 - [ ] 9. Implement Monitoring and Observability
 
@@ -290,13 +309,16 @@ This implementation plan converts the AI-Assisted Software Engineering System de
     - Write integration tests for CI/CD workflow scenarios
     - _Requirements: 7.1, 7.2, 7.4_
 
-  - [ ] 10.2 Build Docker and Kubernetes deployment system
-    - Create Docker containers for all system components
-    - Implement Kubernetes manifests for production deployment
-    - Build auto-scaling and load balancing configuration
-    - Create health checks and readiness probes
-    - Implement configuration management and secrets handling
-    - Write deployment tests and validation scripts
+  - [ ] 10.2 Build Local Docker Compose deployment system
+
+    - Create Docker containers for all 5-layer system components
+    - Implement docker-compose.local.yml for complete local stack deployment
+    - Build service orchestration with proper dependency management and health checks
+    - Create volume mapping for `.module-knowledge.ttl` files and project source code
+    - Implement automatic service startup and NPM package integration
+    - Build configuration management for local development environment
+    - Create monitoring and logging for local Docker stack
+    - Write deployment tests and validation scripts for local setup
     - _Requirements: 11.3, 11.4, 11.6_
 
 - [ ] 11. Implement Error Handling and Recovery Systems
@@ -312,54 +334,68 @@ This implementation plan converts the AI-Assisted Software Engineering System de
 
 - [ ] 12. Implement NPM Package and LLM Enhancement System
 
-  - [ ] 12.1 Build NPM Package Framework
+  - [ ] 12.1 Build NPM Package Framework with Docker orchestration
 
-    - Create npm package structure with proper entry points and dependencies
-    - Implement automatic project detection and initialization when package is installed via npm
-    - Build background service management that starts when package is imported
-    - Create package configuration and settings management in node_modules/.aaswe/
-    - Implement automatic codebase analysis on npm install with postinstall scripts
-    - Write unit tests for package lifecycle and service management
+    - Create npm package structure with Docker Compose files and service definitions
+    - Implement automatic project detection and Docker stack initialization when package is installed via npm
+    - Build Docker service management that starts complete 5-layer architecture locally
+    - Create package configuration and settings management in `.aaswe/` directory
+    - Implement automatic codebase analysis and TTL generation on npm install with postinstall scripts
+    - Build Docker health monitoring and automatic service restart capabilities
+    - Create CLI commands for stack management (start, stop, logs, status)
+    - Write unit tests for package lifecycle, Docker orchestration, and service management
     - _Requirements: 11.1, 11.2_
 
-  - [ ] 12.2 Implement Automatic Project Analysis and RDF Generation
+  - [ ] 12.2 Implement Automatic Project Analysis and TTL Generation for dual-purpose use
 
     - Build system to automatically analyze codebase when npm package is installed
-    - Create system to generate initial `.module-knowledge.ttl` files containing concrete, real information extracted from existing codebases
+    - Create system to generate initial `.module-knowledge.ttl` files containing concrete, real information with rich descriptions optimized for both Neo4j ingestion and direct LLM consumption
     - Implement project structure analysis and module detection to identify actual code modules
-    - Generate concrete RDF files with actual class names, method signatures, dependencies, and relationships from the analyzed code
-    - Build automatic knowledge graph population from generated RDF files
-    - Write integration tests for automatic analysis workflows with real codebase scenarios
-    - _Requirements: 11.2, 11.8_
+    - Generate concrete RDF files with actual class names, method signatures, dependencies, relationships, and human-readable business context placeholders
+    - Build automatic knowledge graph population from generated TTL files
+    - Implement automatic MCP server context loading from TTL files
+    - Create system to detect existing TTL files and preserve developer enhancements during re-analysis
+    - Write integration tests for automatic analysis workflows, dual-purpose TTL generation, and real codebase scenarios
+    - _Requirements: 11.2, 11.8, 11.3, 11.4_
 
-  - [ ] 12.3 Build MCP Server for IDE Integration
+  - [ ] 12.3 Build MCP Server for IDE Integration with TTL-based context
 
-    - Implement Model Context Protocol server that starts with npm package
-    - Create MCP tools that provide codebase context to LLM interactions in IDEs
-    - Build intelligent context selection based on current file, cursor position, and query intent
-    - Implement real-time knowledge graph querying for LLM context enhancement
-    - Add system to help LLM understand project patterns, conventions, and architecture
-    - Write unit tests for MCP server functionality and context enhancement accuracy
+    - Implement Model Context Protocol server that starts with Docker stack and serves TTL content directly to IDEs
+    - Create MCP tools that provide rich codebase context by combining Neo4j graph queries with raw TTL file content
+    - Build intelligent context selection that prioritizes relevant `.module-knowledge.ttl` files based on current file, cursor position, and query intent
+    - Implement real-time TTL file monitoring to update LLM context when developers enhance knowledge files
+    - Create context formatting that presents business descriptions and architectural insights from TTL files in LLM-friendly format
+    - Add system to help LLM understand project patterns, conventions, and architecture through enhanced TTL descriptions
+    - Build context relevance scoring to select most pertinent TTL content for each LLM interaction
+    - Implement context size optimization to stay within LLM token limits while maximizing relevant information
+    - Write unit tests for MCP server functionality, TTL context serving, and context enhancement accuracy
     - _Requirements: 11.3, 11.4, 11.5_
 
-  - [ ] 12.4 Create LLM Context Enhancement System
+  - [ ] 12.4 Create LLM Context Enhancement System using TTL files
 
-    - Build system to provide LLM with codebase context through MCP protocol
-    - Implement dependency tracking and architectural information for LLM interactions
-    - Create system to provide LLM with project-specific patterns and best practices
-    - Build code quality validation and improvement suggestions for LLM outputs
-    - Implement multi-file change coordination when LLM modifies related components
-    - Write integration tests for LLM-assisted code generation and modification workflows
+    - Build system to provide LLM with rich codebase context through MCP protocol using `.module-knowledge.ttl` content
+    - Implement dependency tracking and architectural information extraction from TTL files for LLM interactions
+    - Create system to provide LLM with project-specific patterns and best practices embedded in TTL business context
+    - Build intelligent TTL content aggregation that combines multiple relevant knowledge files for comprehensive context
+    - Implement context personalization based on developer's current task and file location
+    - Build code quality validation using patterns and conventions described in TTL files
+    - Create system to suggest TTL enhancements based on LLM interactions and code changes
+    - Implement multi-file change coordination using dependency information from TTL files
+    - Write integration tests for TTL-based LLM context enhancement and code generation workflows
     - _Requirements: 11.3, 11.4, 11.6_
 
-  - [ ] 12.5 Implement Knowledge Graph Auto-Update System
-    - Build system to automatically detect code changes and update knowledge graph
-    - Create incremental RDF file updates when code is modified
-    - Implement automatic sync between code changes and `.module-knowledge.ttl` files
-    - Build conflict resolution for concurrent knowledge updates
-    - Add system to preserve developer-enhanced RDF content during automatic updates
-    - Write integration tests for automatic knowledge synchronization scenarios
-    - _Requirements: 11.7, 11.8_
+  - [ ] 12.5 Implement Knowledge Graph and MCP Context Auto-Update System
+
+    - Build system to automatically detect code changes and update both knowledge graph and MCP context
+    - Create incremental TTL file updates when code is modified, preserving developer enhancements
+    - Implement automatic sync between code changes and `.module-knowledge.ttl` files with smart merging
+    - Build conflict resolution for concurrent knowledge updates that preserves business context
+    - Add system to preserve developer-enhanced RDF content during automatic updates while refreshing code-derived information
+    - Implement real-time MCP server context refresh when TTL files are updated
+    - Create notification system to inform developers when their TTL enhancements are affected by code changes
+    - Build validation system to ensure TTL updates maintain both RDF syntax and LLM-friendly formatting
+    - Write integration tests for automatic knowledge synchronization, context updates, and developer workflow scenarios
+    - _Requirements: 11.7, 11.8, 11.3, 11.4_
 
 - [ ] 13. Implement Testing and Quality Assurance
 

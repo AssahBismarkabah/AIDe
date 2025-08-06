@@ -1,6 +1,6 @@
 # AI-Assisted Software Engineering System (AASWE)
 
-![High-Level System Architecture](main/docs/High-Level%20System%20Architecture%20Diagram%20Aug%201%202025.png)
+![High-Level System Architecture](main/docs/v1/localdep.png)
 
 ## Overview
 

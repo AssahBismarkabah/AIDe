@@ -1,0 +1,3 @@
+- everything can be used locally with existing user enviroment
+- can go cloud for enterprise scale
+- can interact actions(tool calling) that can be called direclty by the llm from the ide through the client.
