@@ -7,8 +7,13 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true
+    }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(java-parser)/)'
+  ],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
@@ -34,6 +39,8 @@ module.exports = {
   verbose: true,
   // Mock external dependencies
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1'
-  }
+    '^@/(.*)$': '<rootDir>/src/$1',
+    'java-parser': '<rootDir>/tests/__mocks__/java-parser.js'
+  },
+  extensionsToTreatAsEsm: ['.ts']
 };

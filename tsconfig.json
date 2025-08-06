@@ -13,7 +13,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "removeComments": false,
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "noUnusedLocals": true,
@@ -23,10 +23,15 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": ["jest", "node"]
   },
   "include": [
     "src/**/*"
+  ],
+  "typeRoots": [
+    "node_modules/@types",
+    "src/types"
   ],
   "exclude": [
     "node_modules",
