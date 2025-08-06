@@ -1,0 +1,76 @@
+{
+	"name": "@aide/codebase-ai",
+	"version": "1.0.0",
+	"description": "AI-Assisted Software Engineering with local Docker stack for enhanced IDE LLM interactions",
+	"main": "dist/index.js",
+	"bin": {
+		"aide": "dist/cli.js"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch",
+		"start": "node dist/index.js",
+		"docker:up": "docker-compose -f docker-compose.local.yml up -d",
+		"docker:down": "docker-compose -f docker-compose.local.yml down",
+		"docker:logs": "docker-compose -f docker-compose.local.yml logs -f",
+		"docker:status": "docker-compose -f docker-compose.local.yml ps",
+		"test": "jest --passWithNoTests",
+		"test:watch": "jest --watch",
+		"test:coverage": "jest --coverage",
+		"lint": "eslint src/**/*.ts",
+		"lint:fix": "eslint src/**/*.ts --fix"
+	},
+	"keywords": [
+		"ai",
+		"software-engineering",
+		"code-analysis",
+		"llm",
+		"ide-integration",
+		"knowledge-graph",
+		"mcp",
+		"docker"
+	],
+	"author": "AIDe Team",
+	"license": "MIT",
+	"files": [
+		"dist/",
+		"docker-compose.local.yml",
+		"services/",
+		"schemas/",
+		"templates/"
+	],
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.17.1",
+		"chokidar": "^4.0.3",
+		"commander": "^14.0.0",
+		"dotenv": "^17.2.1",
+		"fastify": "^5.4.0",
+		"neo4j-driver": "^5.28.1",
+		"redis": "^5.8.0",
+		"rdflib": "^2.2.37",
+		"winston": "^3.17.0",
+		"yaml": "^2.8.1"
+	},
+	"devDependencies": {
+		"@types/node": "^24.2.0",
+		"@typescript-eslint/eslint-plugin": "^8.39.0",
+		"@typescript-eslint/parser": "^8.39.0",
+		"eslint": "^9.32.0",
+		"jest": "^30.0.5",
+		"@types/jest": "^30.0.0",
+		"ts-jest": "^29.4.1",
+		"typescript": "^5.9.2"
+	},
+	"engines": {
+		"node": ">=18.0.0",
+		"npm": ">=8.0.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/aide/codebase-ai.git"
+	},
+	"bugs": {
+		"url": "https://github.com/aide/codebase-ai/issues"
+	},
+	"homepage": "https://github.com/aide/codebase-ai#readme"
+}
