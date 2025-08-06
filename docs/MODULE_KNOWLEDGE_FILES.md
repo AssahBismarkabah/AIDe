@@ -264,6 +264,125 @@ The system automatically updates code structure, but preserves your business con
    business:belongsToDomain "User Authentication and Authorization" ;
    ```
 
+## Complete Property Reference
+
+### ✅ SAFE TO EDIT - Business & Documentation Properties
+
+#### **Module-Level Business Context Properties:**
+```turtle
+# Business domain and purpose
+business:belongsToDomain "E-commerce Order Processing" ;
+business:hasBusinessRules "Orders require payment validation before fulfillment" ;
+business:supportsUseCases "Customer places order; Payment processing; Order fulfillment" ;
+business:satisfiesAttribute "Performance: < 2 seconds; Reliability: 99.9% uptime" ;
+business:subjectToConstraint "PCI DSS compliance; GDPR data protection" ;
+business:hasStakeholder "Customers; Sales Team; Fulfillment Team" ;
+```
+
+#### **Method/Class Documentation Properties:**
+```turtle
+# Documentation and examples
+code:summary "Validates user credentials against security policies" ;
+code:description "Multi-step validation with rate limiting and account lockout protection" ;
+code:example "validateUser('user@example.com', 'password123')" ;
+code:seeAlso "https://docs.company.com/auth-guide" ;
+code:deprecated "Use validateUserV2 instead - deprecated in v2.0" ;
+```
+
+#### **Business Rule Implementation Properties:**
+```turtle
+# Link code to business requirements
+business:implementsRule "Corporate password complexity standards" ;
+business:supportsUseCase "Secure User Authentication" ;
+```
+
+#### **Custom Domain Properties:**
+```turtle
+# Add your own domain-specific properties
+@prefix ecommerce: <https://yourcompany.com/ontology/ecommerce#> .
+ecommerce:handlesPaymentTypes "Credit Card, PayPal, Bank Transfer" ;
+ecommerce:supportsCurrencies "USD, EUR, GBP" ;
+```
+
+### ❌ NEVER EDIT - Auto-Generated Properties
+
+#### **Core Structure Properties (Auto-Generated from Code):**
+```turtle
+# These are automatically extracted from your source code
+code:name "UserService" ;                    # ❌ Class/method names
+code:signature "validateUser(email, pass)" ; # ❌ Method signatures
+code:language "typescript" ;                 # ❌ Programming language
+code:version "1.0.0" ;                      # ❌ Module version
+code:hasClass code:UserService.User ;       # ❌ Contains classes
+code:hasMethod code:User.authenticate ;     # ❌ Contains methods
+code:hasProperty code:User.email ;          # ❌ Contains properties
+code:extends code:BaseService ;             # ❌ Class inheritance
+code:implements code:IUserService ;         # ❌ Interface implementations
+code:dependsOn code:dependency_lodash ;     # ❌ Dependencies
+```
+
+#### **Technical Metadata Properties:**
+```turtle
+# Technical details extracted during analysis
+code:fullyQualifiedName "UserService.User.authenticate" ; # ❌ Full names
+code:visibility "public" ;                  # ❌ public/private/protected
+code:isStatic false ;                      # ❌ Static method flag
+code:isAsync true ;                        # ❌ Async method flag
+code:isAbstract false ;                    # ❌ Abstract class flag
+code:isOptional false ;                    # ❌ Optional parameter flag
+code:type "string" ;                       # ❌ Parameter/property types
+code:returnType "Promise<boolean>" ;       # ❌ Method return types
+```
+
+#### **Source Location Properties:**
+```turtle
+# File location information
+code:sourceFile "/src/UserService.ts" ;    # ❌ Source file path
+code:startLine 45 ;                        # ❌ Starting line number
+code:endLine 67 ;                          # ❌ Ending line number
+code:startColumn 2 ;                       # ❌ Starting column
+code:endColumn 4 ;                         # ❌ Ending column
+```
+
+#### **Quality Metrics Properties (Auto-Calculated):**
+```turtle
+# Automatically calculated code quality metrics
+quality:cyclomaticComplexity 5 ;           # ❌ Complexity metrics
+quality:cognitiveComplexity 3 ;            # ❌ Cognitive complexity
+quality:linesOfCode 23 ;                   # ❌ Lines of code count
+quality:maintainabilityIndex 78 ;          # ❌ Maintainability score
+```
+
+#### **File Metadata Properties:**
+```turtle
+# System-generated metadata
+code:generatedAt "2025-08-06T19:27:09Z" ;  # ❌ Generation timestamp
+code:checksum "ad666b1832f1215b" ;         # ❌ File checksum
+code:createdAt "2025-08-06T19:27:09Z" ;    # ❌ Creation timestamp
+code:modifiedAt "2025-08-06T19:27:09Z" ;   # ❌ Last modification
+```
+
+### 🔄 **What Happens When You Edit Auto-Generated Properties**
+
+If you accidentally edit auto-generated properties:
+
+1. **Next Code Update**: Your changes will be **overwritten** when the system re-analyzes your code
+2. **Validation Errors**: The system may detect inconsistencies and warn you
+3. **Data Loss**: Manual edits to technical properties are **not preserved**
+
+### 🚨 **Critical Rule**
+
+**ONLY edit properties that start with:**
+- `business:*` (business context)
+- `code:summary` (method/class summaries)
+- `code:description` (detailed descriptions)
+- `code:example` (usage examples)
+- `code:seeAlso` (references)
+- `code:deprecated` (deprecation notes)
+- Custom namespace properties (e.g., `yourcompany:*`)
+
+**Everything else is auto-generated and will be overwritten!**
+
 ## Integration with Development Tools
 
 ### Git Hooks
