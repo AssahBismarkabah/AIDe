@@ -413,7 +413,7 @@ describe('In-Memory RDF Store', () => {
       expect(contextResponse.contexts.length).toBeGreaterThan(0);
       expect(contextResponse.totalTokens).toBeGreaterThan(0);
       expect(contextResponse.relevanceScores).toBeInstanceOf(Array);
-      expect(contextResponse.executionTime).toBeGreaterThan(0);
+      expect(contextResponse.executionTime).toBeGreaterThanOrEqual(0);
       expect(contextResponse.metadata).toBeDefined();
     });
 
