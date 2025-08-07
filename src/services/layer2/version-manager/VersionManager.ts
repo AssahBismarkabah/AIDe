@@ -30,13 +30,12 @@ export class VersionManager extends EventEmitter {
   private versions: Map<string, VersionMetadata> = new Map();
   private rollbackOperations: Map<string, RollbackOperation> = new Map();
   private syncOperations: Map<string, SyncOperation> = new Map();
-  private cleanupTimer?: NodeJS.Timeout;
-  private backupTimer?: NodeJS.Timeout;
+  private cleanupTimer?: NodeJS.Timeout | undefined;
+  private backupTimer?: NodeJS.Timeout | undefined;
 
   constructor(config: VersionManagerConfig) {
     super();
     this.config = config;
-    this.setupCleanupTimer();
   }
 
   /**
@@ -52,6 +51,9 @@ export class VersionManager extends EventEmitter {
       
       // Load existing versions
       await this.loadVersions();
+      
+      // Setup cleanup timer after initialization
+      this.setupCleanupTimer();
       
       // Setup backup if enabled
       if (this.config.backup.enabled) {
@@ -422,10 +424,12 @@ export class VersionManager extends EventEmitter {
       
       if (this.cleanupTimer) {
         clearInterval(this.cleanupTimer);
+        this.cleanupTimer = undefined;
       }
       
       if (this.backupTimer) {
         clearInterval(this.backupTimer);
+        this.backupTimer = undefined;
       }
       
       await this.saveVersions();
@@ -951,6 +955,9 @@ export class VersionManager extends EventEmitter {
           logger.error('Scheduled cleanup failed:', error);
         });
       }, this.config.cleanupInterval);
+      
+      // Ensure timer doesn't keep Node.js process alive
+      this.cleanupTimer.unref();
     }
   }
 
@@ -984,6 +991,9 @@ export class VersionManager extends EventEmitter {
         logger.error('Backup creation failed:', error);
       }
     }, this.config.backup.interval);
+    
+    // Ensure timer doesn't keep Node.js process alive
+    this.backupTimer.unref();
   }
 
   private async cleanupOldBackups(): Promise<void> {
