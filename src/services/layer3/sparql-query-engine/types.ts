@@ -203,8 +203,8 @@ export type SPARQLErrorCode =
 
 export class SPARQLError extends Error {
   public readonly code: SPARQLErrorCode;
-  public readonly query?: string;
-  public readonly sparql?: string;
+  public readonly query: string | undefined;
+  public readonly sparql: string | undefined;
   public readonly details?: any;
 
   constructor(
@@ -219,8 +219,8 @@ export class SPARQLError extends Error {
     super(message);
     this.name = 'SPARQLError';
     this.code = code;
-    this.query = options.query || undefined;
-    this.sparql = options.sparql || undefined;
+    this.query = options.query;
+    this.sparql = options.sparql;
     this.details = options.details;
   }
 }

@@ -662,7 +662,7 @@ export class SPARQLQueryEngine extends EventEmitter {
   /**
    * Extract triple patterns from query and entities
    */
-  private async extractTriplePatterns(query: string, entities: SPARQLEntity[]): Promise<SPARQLTriplePattern[]> {
+  private async extractTriplePatterns(_query: string, entities: SPARQLEntity[]): Promise<SPARQLTriplePattern[]> {
     const patterns: SPARQLTriplePattern[] = [];
     
     // Simple pattern extraction - in production, use more sophisticated NLP

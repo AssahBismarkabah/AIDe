@@ -1,5 +1,4 @@
-import { Document } from '@langchain/core/documents';
-import { BaseLanguageModel } from '@langchain/core/language_models/base';
+// Types for GraphCypher QA Chain - removed unused imports
 
 export interface CypherQAConfig {
   // Neo4j connection configuration

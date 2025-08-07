@@ -1,8 +1,4 @@
 import { Document } from '@langchain/core/documents';
-import { BaseRetriever } from '@langchain/core/retrievers';
-import { BaseLanguageModel } from '@langchain/core/language_models/base';
-import { VectorStore } from '@langchain/core/vectorstores';
-import { Embeddings } from '@langchain/core/embeddings';
 
 export interface RAGConfig {
   // Vector store configuration
