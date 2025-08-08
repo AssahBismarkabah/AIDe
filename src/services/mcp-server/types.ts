@@ -147,12 +147,7 @@ export interface TTLFile {
     properties: string[];
     individuals: string[];
   };
-  metadata: {
-    module: string;
-    language: string;
-    dependencies: string[];
-    businessContext: string[];
-  };
+  metadata: TTLContextMetadata;
 }
 
 export interface TTLTriple {
@@ -345,4 +340,170 @@ export interface MCPConfigValidation {
     message: string;
     value?: any;
   }>;
+}
+
+// TTL Context Loader Types
+export interface TTLContextLoaderConfig {
+  watchEnabled: boolean;
+  watchPatterns?: string[];
+  watchIgnored?: (string | RegExp)[];
+  watchDebounce?: number;
+  loadPatterns?: string[];
+  loadIgnored?: string[];
+  loadConcurrency?: number;
+  cacheEnabled: boolean;
+  maxCacheSize: number;
+  cacheTtl: number;
+  maxTokens: number;
+  maxFiles: number;
+  relevanceThreshold: number;
+}
+
+export interface TTLContextMetadata {
+  module: string;
+  language: string;
+  dependencies: string[];
+  businessContext: string[];
+  architecturalPatterns: string[];
+  qualityMetrics: Record<string, number>;
+  concreteContext?: ConcreteCodeContext;
+  extractedAt: Date;
+  loadedAt?: Date;
+  version?: string;
+}
+
+export interface TTLContextCache {
+  key: string;
+  context: ContextResponse;
+  timestamp: number;
+  ttl: number;
+  hits: number;
+}
+
+export interface ConcreteCodeContext {
+  classes: Array<{ name: string; type: string; properties: string[] }>;
+  methods: Array<{ name: string; signature: string; returnType: string }>;
+  properties: Array<{ name: string; type: string; access: string }>;
+  relationships: Array<{ from: string; to: string; type: string }>;
+  imports: string[];
+  codeStructure: Record<string, any>;
+  businessDomain: Record<string, any>;
+  extractedAt: Date;
+}
+
+export interface BusinessContextEnhancement {
+  domain: string;
+  patterns: string[];
+  insights: string[];
+  recommendations: string[];
+  lastUpdated: Date;
+}
+
+export interface TTLLoadingEvent {
+  type: 'created' | 'modified' | 'deleted';
+  path: string;
+  timestamp: number;
+}
+
+export interface TTLContextLoaderMetrics {
+  ttlFiles: {
+    total: number;
+    loaded: number;
+    failed: number;
+    watching: number;
+  };
+  context: {
+    requests: number;
+    cacheHits: number;
+    cacheMisses: number;
+    averageResponseTime: number;
+    averageRelevanceScore: number;
+  };
+  performance: {
+    memoryUsage: number;
+    loadingQueueSize: number;
+    cacheSize: number;
+    lastCleanup: Date;
+  };
+}
+
+// Enhanced MCP Server Types
+export interface EnhancedMCPServerConfig {
+  mcpServer: MCPServerConfig;
+  ttlContextLoader: TTLContextLoaderConfig;
+  integration: {
+    autoRefreshInterval?: number;
+    performanceOptimization: boolean;
+    healthCheckInterval?: number;
+  };
+}
+
+export interface EnhancedMCPServerMetrics {
+  server: {
+    uptime: number;
+    totalRequests: number;
+    enhancedContextRequests: number;
+    ttlContextRequests: number;
+    averageResponseTime: number;
+    errorRate: number;
+  };
+  ttlIntegration: {
+    ttlFilesLoaded: number;
+    contextCacheHits: number;
+    contextCacheMisses: number;
+    averageRelevanceScore: number;
+    knowledgeGraphQueries: number;
+  };
+  performance: {
+    memoryUsage: number;
+    contextLoadingTime: number;
+    ttlProcessingTime: number;
+    lastOptimization: Date;
+  };
+}
+
+export interface TTLIntegrationEvent {
+  type: 'created' | 'modified' | 'deleted' | 'refreshed';
+  path: string;
+  timestamp: number;
+  data?: any;
+}
+
+// Integration Types
+export interface MCPAnalysisIntegrationConfig {
+  mcpServer: MCPServerConfig;
+  ttlContextLoader: TTLContextLoaderConfig;
+  autoRefreshInterval?: number;
+  performanceOptimization?: boolean;
+  healthCheckInterval?: number;
+}
+
+export interface IntegrationEvent {
+  type: string;
+  data: any;
+  timestamp: number;
+  success?: boolean;
+  error?: string;
+}
+
+export interface IntegrationMetrics {
+  integration: {
+    totalSyncs: number;
+    successfulSyncs: number;
+    failedSyncs: number;
+    lastSyncTime: Date;
+    averageSyncTime: number;
+  };
+  analysis: {
+    triggeredAnalyses: number;
+    completedAnalyses: number;
+    ttlFilesGenerated: number;
+    knowledgeGraphUpdates: number;
+  };
+  mcp: {
+    contextRequests: number;
+    enhancedContextRequests: number;
+    cacheHitRate: number;
+    averageResponseTime: number;
+  };
 }

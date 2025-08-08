@@ -987,7 +987,10 @@ export class MCPServer extends EventEmitter {
       module: this.extractModuleName(path),
       language,
       dependencies,
-      businessContext: comments.map(c => c.replace('#', '').trim()).filter(Boolean)
+      businessContext: comments.map(c => c.replace('#', '').trim()).filter(Boolean),
+      architecturalPatterns: [],
+      qualityMetrics: {},
+      extractedAt: new Date()
     };
   }
 
