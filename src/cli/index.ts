@@ -35,6 +35,7 @@ program
   .option('-m, --mode <mode>', 'Deployment mode: context-only or full', 'context-only')
   .option('-p, --port <port>', 'Server port', '3001')
   .option('-c, --config <path>', 'Configuration file path')
+  .option('--project-path <path>', 'Custom project path', process.cwd())
   .option('--no-watch', 'Disable TTL file watching')
   .option('--debug', 'Enable debug logging')
   .action(async (options) => {
@@ -43,19 +44,25 @@ program
         process.env.LOG_LEVEL = 'debug';
       }
 
+      // Set project path
+      const projectPath = options.projectPath || process.cwd();
+      process.env.PROJECT_PATH = projectPath;
+
       logger.info('🚀 Starting AASWE System', {
         mode: options.mode,
         port: options.port,
+        projectPath: projectPath,
         version: '1.0.0'
       });
 
       // Load configuration
-      const config = options.config ? 
-        require(join(process.cwd(), options.config)) : 
+      const config = options.config ?
+        require(join(projectPath, options.config)) :
         createDefaultMCPConfig();
 
       config.server.port = parseInt(options.port);
       config.ttl.watchEnabled = options.watch;
+      config.projectPath = projectPath;
 
       // Initialize services based on mode
       let layer3Service: Layer3AIService | null = null;
@@ -182,6 +189,7 @@ program
   .command('init')
   .description('Initialize AASWE in the current project')
   .option('-f, --force', 'Overwrite existing configuration')
+  .option('-m, --mode <mode>', 'Initialize for specific mode: context-only or full', 'context-only')
   .action(async (options) => {
     try {
       const configPath = join(process.cwd(), 'aaswe.config.js');
@@ -192,16 +200,17 @@ program
         return;
       }
 
-      logger.info('🔧 Initializing AASWE in current project...');
+      logger.info(`🔧 Initializing AASWE in current project for ${options.mode} mode...`);
 
-      // Create configuration file
+      // Create configuration file with mode-specific settings
       const configContent = `
-// AASWE Configuration
+// AASWE Configuration - ${options.mode} mode
 module.exports = {
+  mode: '${options.mode}',
   server: {
     name: 'AASWE-MCP-Server',
     version: '1.0.0',
-    port: 3001,
+    port: ${options.mode === 'full' ? '8000' : '3001'},
     host: 'localhost'
   },
   context: {
@@ -216,25 +225,34 @@ module.exports = {
     watchDebounce: 1000,
     maxFileSize: 1024 * 1024,
     encoding: 'utf-8'
-  }
+  }${options.mode === 'full' ? `,
+  docker: {
+    enabled: true,
+    composeFile: 'docker-compose.local.yml'
+  }` : ''}
 };
 `;
 
-      // Create environment file
+      // Create environment file with mode-specific content
       const envContent = `
-# AASWE Environment Configuration
+# AASWE Environment Configuration - ${options.mode} mode
 # Uncomment and configure as needed
 
-# OpenAI Configuration (for full mode)
+${options.mode === 'full' ? `# Full Mode Configuration
+# OpenAI Configuration
 # OPENAI_API_KEY=your_openai_api_key_here
 
-# Anthropic Configuration (for full mode)  
+# Anthropic Configuration
 # ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
-# Neo4j Configuration (for full mode)
+# Neo4j Configuration
 # NEO4J_URI=bolt://localhost:7687
 # NEO4J_USERNAME=neo4j
 # NEO4J_PASSWORD=password
+
+# Redis Configuration
+# REDIS_URL=redis://localhost:6379` : `# Context-Only Mode Configuration
+# No additional API keys required - uses your existing IDE LLM`}
 
 # Logging
 LOG_LEVEL=info
@@ -249,9 +267,18 @@ LOG_LEVEL=info
       logger.info(`   - ${envPath}`);
       logger.info('');
       logger.info('🚀 Next steps:');
-      logger.info('   1. Run: aaswe start --mode=context-only');
-      logger.info('   2. Configure your IDE to connect to: ws://localhost:3001');
-      logger.info('   3. Your IDE LLM will now have rich codebase context!');
+      if (options.mode === 'context-only') {
+        logger.info('   1. Run: aaswe start --mode=context-only');
+        logger.info('   2. Configure your IDE to connect to: ws://localhost:3001');
+        logger.info('   3. Your IDE LLM will now have rich codebase context!');
+      } else {
+        logger.info('   1. Set up API keys in .env.aaswe (if needed)');
+        logger.info('   2. Run: aaswe docker up');
+        logger.info('   3. Access services:');
+        logger.info('      - MCP Server: ws://localhost:8000');
+        logger.info('      - Web Interface: http://localhost:3000');
+        logger.info('      - Neo4j Browser: http://localhost:7474');
+      }
 
     } catch (error) {
       logger.error('❌ Failed to initialize AASWE', { error });
@@ -295,19 +322,47 @@ program
   .description('Analyze current project and generate TTL knowledge files')
   .option('-o, --output <dir>', 'Output directory for TTL files', './knowledge')
   .option('--languages <langs>', 'Comma-separated list of languages to analyze', 'typescript,javascript,python,java')
+  .option('--debug', 'Enable debug logging')
   .action(async (options) => {
+    if (options.debug) {
+      process.env.LOG_LEVEL = 'debug';
+    }
     try {
-      logger.info('🔍 Analyzing project for knowledge extraction...');
+      logger.info('🔍 Starting automatic project analysis...');
       
       const outputDir = join(process.cwd(), options.output);
       await mkdir(outputDir, { recursive: true });
 
-      logger.info('📊 Project analysis complete!');
-      logger.info(`📁 TTL files will be generated in: ${outputDir}`);
-      logger.info('💡 This feature will be implemented in the next phase');
+      // Import and run the AutoAnalysisWorkflow
+      const { AutoAnalysisWorkflow } = await import('../services/project-analysis/AutoAnalysisWorkflow');
+      
+      const workflow = new AutoAnalysisWorkflow({
+        projectRoot: process.cwd(),
+        outputDirectory: outputDir,
+        languages: options.languages.split(',').map((lang: string) => lang.trim()),
+        preserveBusinessContext: true,
+        enableKnowledgeGraphPopulation: true, // Enable Neo4j if available
+        enableMCPContextLoading: false // CLI mode doesn't need MCP server
+      });
+
+      logger.info('🚀 Running comprehensive analysis workflow...');
+      const result = await workflow.executeComprehensiveAnalysis();
+
+      logger.info('✅ Project analysis completed successfully!', {
+        filesAnalyzed: result.summary.analyzedFiles,
+        ttlFilesGenerated: result.summary.ttlFilesGenerated,
+        executionTime: `${result.duration}ms`
+      });
+      
+      logger.info(`📁 TTL knowledge files generated in: ${outputDir}`);
+      logger.info('🔗 Files can now be used by MCP servers for enhanced IDE context');
       
     } catch (error) {
-      logger.error('❌ Failed to analyze project', { error });
+      console.error('Full error details:', error);
+      logger.error('❌ Failed to analyze project', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       process.exit(1);
     }
   });
@@ -365,6 +420,132 @@ dockerCmd
       });
     } catch (error) {
       logger.error('❌ Failed to stop Docker services', { error });
+      process.exit(1);
+    }
+  });
+
+dockerCmd
+  .command('logs [service]')
+  .description('View logs for AASWE Docker services')
+  .option('-f, --follow', 'Follow log output')
+  .action(async (service, options) => {
+    try {
+      const { spawn } = require('child_process');
+      const args = ['compose', 'logs'];
+      if (options.follow) args.push('-f');
+      if (service) args.push(service);
+
+      logger.info(`🐳 Viewing logs for ${service || 'all services'}...`);
+      const child = spawn('docker', args, { stdio: 'inherit' });
+      
+      child.on('close', (code) => {
+        if (code !== 0) {
+          logger.error('❌ Failed to view Docker logs');
+          process.exit(code);
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Failed to view Docker logs', { error });
+      process.exit(1);
+    }
+  });
+
+/**
+ * Git hooks command - Manage Git hooks for TTL file versioning
+ */
+const gitCmd = program
+  .command('git')
+  .description('Git integration and hooks management');
+
+gitCmd
+  .command('install-hooks')
+  .description('Install Git hooks for TTL file versioning')
+  .option('--pre-commit', 'Install pre-commit hook for TTL validation', true)
+  .option('--post-commit', 'Install post-commit hook for re-analysis', true)
+  .option('--post-merge', 'Install post-merge hook for conflict resolution', true)
+  .option('--auto-reanalyze', 'Enable automatic re-analysis on TTL changes', true)
+  .action(async (options) => {
+    try {
+      logger.info('🔧 Installing Git hooks for TTL file versioning...');
+      
+      const { GitHooksManager } = await import('../services/git-integration/GitHooksManager');
+      
+      const manager = new GitHooksManager({
+        projectRoot: process.cwd(),
+        ttlDirectories: ['./knowledge', './clean-knowledge', './.aaswe/knowledge'],
+        ttlPatterns: ['**/*.ttl', '**/*.module-knowledge.ttl'],
+        enablePreCommitHook: options.preCommit,
+        enablePostCommitHook: options.postCommit,
+        enablePostMergeHook: options.postMerge,
+        autoReanalyzeOnTTLChange: options.autoReanalyze
+      });
+
+      await manager.initialize();
+      
+      logger.info('✅ Git hooks installed successfully!');
+      logger.info('💡 TTL files will now be automatically validated and re-analyzed');
+      
+    } catch (error) {
+      logger.error('❌ Failed to install Git hooks', { error });
+      process.exit(1);
+    }
+  });
+
+gitCmd
+  .command('status')
+  .description('Check Git hooks status')
+  .action(async () => {
+    try {
+      const { GitHooksManager } = await import('../services/git-integration/GitHooksManager');
+      
+      const manager = new GitHooksManager({
+        projectRoot: process.cwd(),
+        ttlDirectories: ['./knowledge', './clean-knowledge', './.aaswe/knowledge'],
+        ttlPatterns: ['**/*.ttl', '**/*.module-knowledge.ttl'],
+        enablePreCommitHook: true,
+        enablePostCommitHook: true,
+        enablePostMergeHook: true,
+        autoReanalyzeOnTTLChange: true
+      });
+
+      const status = await manager.getStatus();
+      
+      logger.info('📊 Git Hooks Status:', {
+        gitRepository: status.isGitRepo ? '✅ Yes' : '❌ No',
+        preCommitHook: status.hooksInstalled['pre-commit']?.isAASWE ? '✅ Installed' : '❌ Not installed',
+        postCommitHook: status.hooksInstalled['post-commit']?.isAASWE ? '✅ Installed' : '❌ Not installed',
+        postMergeHook: status.hooksInstalled['post-merge']?.isAASWE ? '✅ Installed' : '❌ Not installed'
+      });
+      
+    } catch (error) {
+      logger.error('❌ Failed to check Git hooks status', { error });
+    }
+  });
+
+gitCmd
+  .command('uninstall-hooks')
+  .description('Uninstall AASWE Git hooks')
+  .action(async () => {
+    try {
+      logger.info('🗑️  Uninstalling AASWE Git hooks...');
+      
+      const { GitHooksManager } = await import('../services/git-integration/GitHooksManager');
+      
+      const manager = new GitHooksManager({
+        projectRoot: process.cwd(),
+        ttlDirectories: ['./knowledge', './clean-knowledge', './.aaswe/knowledge'],
+        ttlPatterns: ['**/*.ttl', '**/*.module-knowledge.ttl'],
+        enablePreCommitHook: false,
+        enablePostCommitHook: false,
+        enablePostMergeHook: false,
+        autoReanalyzeOnTTLChange: false
+      });
+
+      await manager.uninstall();
+      logger.info('✅ Git hooks uninstalled successfully');
+      
+    } catch (error) {
+      logger.error('❌ Failed to uninstall Git hooks', { error });
       process.exit(1);
     }
   });

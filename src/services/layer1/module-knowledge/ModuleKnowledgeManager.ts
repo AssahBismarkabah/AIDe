@@ -1524,6 +1524,14 @@ aide:${baseName} aide:analysisTimestamp "${new Date().toISOString()}"^^xsd:dateT
     logger.debug('Syncing to knowledge graph', { filePath, contentLength: content.length });
     
     try {
+      // Check if Neo4j is available before attempting sync
+      const neo4jAvailable = await this.checkNeo4jAvailability();
+      
+      if (!neo4jAvailable) {
+        logger.debug('Neo4j not available, skipping knowledge graph sync', { filePath });
+        return;
+      }
+      
       // Parse TTL content to extract triples
       const triples = await this.parseTTLContent(content);
       const moduleId = this.extractModuleId(content, filePath);
@@ -1563,8 +1571,8 @@ aide:${baseName} aide:analysisTimestamp "${new Date().toISOString()}"^^xsd:dateT
         await session.close();
       }
     } catch (error) {
-      logger.error('Failed to sync to knowledge graph', { filePath, error });
-      throw error;
+      logger.debug('Knowledge graph sync failed, continuing without Neo4j', { filePath, error: error instanceof Error ? error.message : 'Unknown error' });
+      // Don't throw error - knowledge graph sync is optional
     }
   }
 
@@ -1641,6 +1649,43 @@ aide:${baseName} aide:analysisTimestamp "${new Date().toISOString()}"^^xsd:dateT
       return fileName.replace(/[^a-zA-Z0-9]/g, '_');
     }
 
+  /**
+   * Check if Neo4j is available for knowledge graph operations
+   */
+  private async checkNeo4jAvailability(): Promise<boolean> {
+    try {
+      // Check if Neo4j environment variables are set
+      const neo4jUri = process.env.NEO4J_URI;
+      const neo4jUsername = process.env.NEO4J_USERNAME || process.env.NEO4J_USER;
+      const neo4jPassword = process.env.NEO4J_PASSWORD;
+
+      if (!neo4jUri || !neo4jUsername || !neo4jPassword) {
+        logger.debug('Neo4j credentials not configured');
+        return false;
+      }
+
+      // Try to connect to Neo4j
+      const { Neo4jDatabaseService } = await import('../../layer2/neo4j-database/Neo4jDatabaseService');
+      const neo4jService = new Neo4jDatabaseService();
+
+      const config = {
+        uri: neo4jUri,
+        username: neo4jUsername,
+        password: neo4jPassword,
+        database: 'neo4j'
+      };
+
+      await neo4jService.connect(config);
+      const isHealthy = await neo4jService.testConnection();
+      await neo4jService.disconnect();
+
+      return isHealthy;
+    } catch (error) {
+      logger.debug('Neo4j availability check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      return false;
+    }
+  }
+
   private async getNeo4jDriver(): Promise<any> {
       // Initialize Neo4j driver if not already done
       if (!this.neo4jDriver) {
@@ -1648,7 +1693,7 @@ aide:${baseName} aide:analysisTimestamp "${new Date().toISOString()}"^^xsd:dateT
         this.neo4jDriver = neo4j.driver(
           process.env.NEO4J_URI || 'bolt://localhost:7687',
           neo4j.auth.basic(
-            process.env.NEO4J_USER || 'neo4j',
+            process.env.NEO4J_USERNAME || process.env.NEO4J_USER || 'neo4j',
             process.env.NEO4J_PASSWORD || 'password'
           )
         );

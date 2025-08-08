@@ -1,505 +1,442 @@
 # AASWE - AI-Assisted Software Engineering
 
-AI-Assisted Software Engineering with enhanced IDE LLM context through automatic codebase analysis, knowledge graphs, and semantic code understanding.
+[![npm version](https://badge.fury.io/js/@aaswe/codebase-ai.svg)](https://badge.fury.io/js/@aaswe/codebase-ai)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js CI](https://github.com/aaswe/codebase-ai/workflows/Node.js%20CI/badge.svg)](https://github.com/aaswe/codebase-ai/actions)
 
-## Overview
+**Rich codebase context for IDE LLMs through automatic analysis and knowledge graph generation.**
 
-AASWE automatically analyzes your codebase to create comprehensive knowledge graphs and TTL files that enhance LLM interactions in your IDE. It combines Abstract Syntax Tree (AST) analysis with semantic relationships and business context to provide intelligent code assistance through the Model Context Protocol (MCP).
+AASWE transforms your codebase into structured knowledge that enhances your IDE's AI capabilities. Get better code suggestions, more accurate refactoring, and deeper insights by providing your LLM with comprehensive project context.
 
 ## 🚀 Quick Start
 
-### Context-Only Mode (Recommended)
-Perfect for individual developers who want enhanced IDE context without complex setup.
+### Option 1: One-Command Setup (Recommended)
+```bash
+# Install and setup in one command
+curl -fsSL https://raw.githubusercontent.com/aaswe/codebase-ai/main/scripts/quick-start.sh | bash
+```
 
+### Option 2: Manual Installation
 ```bash
 # Install globally
 npm install -g @aaswe/codebase-ai
 
+# Initialize in your project
+cd your-project
+aaswe init
+
+# Start the system
+aaswe start
+```
+
+### Option 3: Docker Compose (Full System)
+```bash
+# Clone and start
+git clone https://github.com/aaswe/codebase-ai.git
+cd codebase-ai
+docker-compose up -d
+```
+
+## ✨ Features
+
+### 🧠 **Intelligent Code Analysis**
+- **Multi-language support**: TypeScript, JavaScript, Python, Java, Go, Rust, C++
+- **Concrete information extraction**: Real class names, method signatures, dependencies
+- **Architectural pattern detection**: Factory, Singleton, Observer, Builder patterns
+- **Business domain analysis**: E-commerce, Finance, Healthcare domain detection
+
+### 📊 **Knowledge Graph Generation**
+- **RDF/TTL files**: Structured knowledge in industry-standard formats
+- **Neo4j integration**: Graph database for complex relationship queries
+- **Business context preservation**: Maintains developer annotations during re-analysis
+- **Incremental updates**: Efficient analysis of changed files only
+
+### 🔗 **IDE Integration**
+- **Model Context Protocol (MCP)**: Universal IDE integration standard
+- **VS Code support**: Works with Continue extension
+- **Cursor support**: Native MCP integration
+- **Any MCP-compatible IDE**: Universal compatibility
+
+### 🐳 **Easy Deployment**
+- **Context-only mode**: No infrastructure required
+- **Full system mode**: Complete with Neo4j and web interface
+- **Docker Compose**: One-command deployment
+- **Health monitoring**: Built-in health checks and metrics
+
+## 📋 System Requirements
+
+### Minimum (Context-Only Mode)
+- **Node.js**: 18.0.0+
+- **Memory**: 512MB RAM
+- **Disk**: 100MB free space
+
+### Recommended (Full System)
+- **Node.js**: 20.0.0+
+- **Memory**: 2GB RAM
+- **Disk**: 1GB free space
+- **Docker**: 20.0.0+ (for full system)
+
+## 🛠 Installation & Setup
+
+### Global Installation
+```bash
+npm install -g @aaswe/codebase-ai
+```
+
+### Project Initialization
+```bash
 # Navigate to your project
 cd your-project
 
 # Initialize AASWE
 aaswe init
 
-# Start the system
-aaswe start --mode=context-only
-
-# Configure your IDE to connect to: ws://localhost:3001
+# For full system mode
+aaswe init --mode full
 ```
 
-### Full Mode (Advanced Development)
-For teams and advanced users who want the complete 5-layer architecture with all services.
+### Configuration
+AASWE creates these files:
+- `aaswe.config.js` - Main configuration
+- `.env.aaswe` - Environment variables
+- `.aaswe/` - Analysis cache and knowledge files
 
+## 🚀 Usage
+
+### Basic Commands
+
+#### Start the System
 ```bash
-# Clone the repository
-git clone https://github.com/aaswe/codebase-ai.git
-cd aaswe-eng
+# Context-only mode (recommended)
+aaswe start
 
-# Start the complete Docker stack
-aaswe docker up
+# Full system mode
+aaswe start --mode full --port 8000
 
-# Access services:
-# - MCP Server: ws://localhost:8000
-# - Web Interface: http://localhost:3000
-# - Neo4j Browser: http://localhost:7474
+# With debug logging
+aaswe start --debug
 ```
 
-## ✨ Key Features
-
-###  Automatic Project Analysis
-- **NPM Install Trigger**: Automatically analyzes your codebase when packages are installed
-- **Multi-Language Support**: TypeScript, JavaScript, Python, Java, Go, Rust, C++
-- **Concrete Information**: Extracts real class names, method signatures, dependencies
-- **Business Context Preservation**: Maintains developer enhancements during re-analysis
-
-###  Knowledge Graph & Context
-- **Neo4j Knowledge Graph**: Stores code relationships and semantic connections
-- **TTL Files**: `.module-knowledge.ttl` files with concrete code information
-- **MCP Integration**: Seamless IDE LLM enhancement via Model Context Protocol
-- **Real-time Updates**: File watching and automatic context refresh
-
-###  Local-First Architecture
-- **No Cloud Dependencies**: Everything runs locally on your machine
-- **Docker Integration**: Complete containerized deployment
-- **Privacy Focused**: Your code never leaves your environment
-- **Production Ready**: 389 tests with 100% success rate
-
-##  Two Deployment Modes
-
-| Feature | Context-Only Mode | Full Mode |
-|---------|------------------|-----------|
-| **Installation** | `npm install -g @aaswe/codebase-ai` | Git clone + Docker Compose |
-| **Setup Complexity** | Simple (single command) | Advanced (Docker stack) |
-| **Resource Usage** | 4GB RAM, 2 CPU cores | 8GB RAM, 4 CPU cores |
-| **Services** | MCP Server + Neo4j | 15+ microservices |
-| **Use Case** | Individual developers | Teams & enterprises |
-| **AI Requirements** | Uses your existing IDE LLM | Advanced AI analysis |
-
-### Context-Only Mode Architecture
-
-```
-
-```
-
-### Full Mode Architecture (5-Layer System)
-
-```
-
-```
-
-## 🛠️ Installation & Setup
-
-### Prerequisites
-
-- **Node.js** ≥18.0.0
-- **Docker & Docker Compose** (for Full Mode only)
-- **Git** (recommended)
-
-### Context-Only Mode Setup
-
+#### Analyze Your Project
 ```bash
-# 1. Install AASWE globally
-npm install -g @aaswe/codebase-ai
+# Basic analysis
+aaswe analyze
 
-# 2. Navigate to your project
-cd your-project
+# Custom output directory
+aaswe analyze --output ./knowledge
 
-# 3. Initialize AASWE (creates config files)
-aaswe init
-
-# 4. Start the system
-aaswe start --mode=context-only
-
-# 5. Configure your IDE to connect to: ws://localhost:3001
+# Specific languages
+aaswe analyze --languages typescript,python
 ```
 
-### Full Mode Setup
-
+#### Check Status
 ```bash
-# 1. Clone the repository
-git clone https://github.com/aaswe/codebase-ai.git
-cd aaswe-eng
-
-# 2. Set up environment variables (optional)
-cp .env.example .env
-# Edit .env with your API keys if needed
-
-# 3. Start the complete Docker stack
-docker-compose up -d
-
-# 4. Access services:
-# - MCP Server: ws://localhost:8000
-# - Web Interface: http://localhost:3000
-# - Neo4j Browser: http://localhost:7474
-```
-
-## 📋 CLI Commands
-
-### Core Commands
-
-```bash
-# Start the AASWE system
-aaswe start [options]
-
-# Initialize AASWE in current project
-aaswe init [options]
-
-# Check server status
+# Check if server is running
 aaswe status
 
-# Manually analyze project
-aaswe analyze [options]
+# Check specific port
+aaswe status --port 3001
 ```
 
-### Docker Commands (Full Mode)
-
+#### Docker Commands
 ```bash
-# Start Docker services
-aaswe docker up
+# Start with Docker
+aaswe docker up -d
 
-# Stop Docker services
+# View logs
+aaswe docker logs -f
+
+# Stop services
 aaswe docker down
-
-# View service logs
-docker-compose logs -f [service-name]
 ```
 
-### Command Options
+### IDE Configuration
 
-```bash
-# Start options
-aaswe start --mode=context-only    # Context-only mode (recommended)
-aaswe start --port=3001            # Custom port
-aaswe start --debug                # Enable debug logging
-
-# Init options
-aaswe init --force                 # Force reinitialize
-
-# Analyze options
-aaswe analyze --output=./knowledge # Custom output directory
-aaswe analyze --languages=ts,js    # Specific languages only
-```
-
-## 🔧 Automatic Analysis Workflow
-
-AASWE automatically analyzes your codebase through a 7-phase process:
-
-1. **Trigger Detection**: NPM install hooks detect package installations
-2. **Project Discovery**: Identifies project structure and source files
-3. **AST Analysis**: Multi-language code parsing and structure extraction
-4. **TTL Generation**: Creates `.module-knowledge.ttl` files with concrete information
-5. **Knowledge Graph Population**: Updates Neo4j with code relationships
-6. **Business Context Preservation**: Maintains developer enhancements during re-analysis
-7. **MCP Context Loading**: Prepares context for IDE LLM consumption
-
-### Generated TTL Files
-
-AASWE creates `.module-knowledge.ttl` files in your source directories:
-
-```
-src/
-├── components/
-│   ├── UserService.ts
-│   └── .module-knowledge.ttl    ← Generated automatically
-├── utils/
-│   ├── helpers.ts
-│   └── .module-knowledge.ttl    ← Generated automatically
-```
-
-### Business Context Enhancement
-
-You can enhance the generated TTL files with business context:
-
-```turtle
-@prefix business: <https://aaswe.ai/ontology/business#> .
-@prefix code: <https://aaswe.ai/ontology/code#> .
-
-# Replace placeholders with actual business context
-module:UserService 
-    business:belongsToDomain "User Authentication and Authorization" ;
-    business:hasBusinessRules "
-    - Users must verify email before activation
-    - Password must meet complexity requirements  
-    - Failed login attempts trigger account lockout
-    " ;
-    business:supportsUseCases "
-    - User Registration
-    - User Login
-    - Password Reset
-    - Profile Updates
-    " .
-```
-
-## 🔌 IDE Integration
-
-### VS Code with Claude
-
-Add to your VS Code settings:
-
+#### VS Code with Continue
+1. Install the [Continue extension](https://marketplace.visualstudio.com/items?itemName=Continue.continue)
+2. Add to your Continue `config.json`:
 ```json
-// .vscode/settings.json
-{
-  "mcp.servers": {
-    "aaswe": {
-      "command": "aaswe",
-      "args": ["start", "--mode=context-only"],
-      "env": {
-        "PROJECT_PATH": "${workspaceFolder}"
-      }
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Add to your Claude Desktop config:
-
-```json
-// claude_desktop_config.json
 {
   "mcpServers": {
     "aaswe": {
-      "command": "aaswe",
-      "args": ["start", "--mode=context-only"],
-      "env": {
-        "PROJECT_PATH": "/path/to/your/project"
-      }
+      "command": "node",
+      "args": ["/path/to/aaswe/dist/cli/index.js", "start", "--port", "3001"],
+      "env": {}
     }
   }
 }
+```
+
+#### Cursor
+1. Go to **Settings → Features → Model Context Protocol**
+2. Add server:
+   - **Name**: AASWE
+   - **Command**: `node`
+   - **Args**: `["/path/to/aaswe/dist/cli/index.js", "start", "--port", "3001"]`
+
+#### Other IDEs
+Connect to the MCP server at `ws://localhost:3001`
+
+## 📁 Project Structure
+
+```
+your-project/
+├── aaswe.config.js          # AASWE configuration
+├── .env.aaswe              # Environment variables
+├── .aaswe/                 # AASWE data directory
+│   ├── knowledge/          # Generated TTL files
+│   ├── cache/              # Analysis cache
+│   └── backups/            # Business context backups
+└── knowledge/              # Custom output directory
+    ├── src.module-knowledge.ttl
+    ├── services.module-knowledge.ttl
+    └── ...
 ```
 
 ## ⚙️ Configuration
 
-### Environment Variables
-
-Create a `.env` file in your project root:
-
-```bash
-# Basic Configuration
-NODE_ENV=production
-LOG_LEVEL=info
-PORT=3001
-
-# Database Configuration (automatically configured)
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=aaswe-password
-
-# Analysis Configuration
-SUPPORTED_LANGUAGES=typescript,javascript,python,java,go,rust,cpp
-ANALYSIS_DEPTH=deep
-INCREMENTAL_ANALYSIS=true
-
-# Skip automatic analysis (if needed)
-AASWE_SKIP_POSTINSTALL=false
-```
-
-### Configuration File
-
-AASWE creates an `aaswe.config.js` file when you run `aaswe init`:
-
+### Basic Configuration (`aaswe.config.js`)
 ```javascript
-// aaswe.config.js
 module.exports = {
+  mode: 'context-only', // or 'full'
   server: {
-    name: 'AASWE-MCP-Server',
-    version: '1.0.0',
     port: 3001,
     host: 'localhost'
   },
   context: {
     maxTokens: 8000,
     maxFiles: 10,
-    relevanceThreshold: 0.3,
-    cacheEnabled: true,
-    cacheTtl: 300000
+    relevanceThreshold: 0.3
   },
   ttl: {
     watchEnabled: true,
-    watchDebounce: 1000,
-    maxFileSize: 1024 * 1024,
-    encoding: 'utf-8'
+    watchDebounce: 1000
   }
 };
 ```
 
-## 🔍 Service Endpoints
-
-### Context-Only Mode
-| Service | Port | Description |
-|---------|------|-------------|
-| AASWE MCP Server | 3001 | Main MCP server for IDE integration |
-| Neo4j Browser | 7474 | Graph database web interface |
-| Neo4j Bolt | 7687 | Database connection |
-
-### Full Mode (Additional Services)
-| Service | Port | Description |
-|---------|------|-------------|
-| MCP Server | 8000 | Enhanced MCP server |
-| API Gateway | 8080 | REST API endpoints |
-| Web Interface | 3000 | Management dashboard |
-| LLM Gateway | 8001 | AI service coordination |
-| RAG Engine | 8002 | Retrieval-Augmented Generation |
-| Code Assistant | 8003 | Advanced code assistance |
-| Redis Cache | 6379 | Caching layer |
-
-## 🧪 Development & Testing
-
-### Build from Source
-
+### Environment Variables (`.env.aaswe`)
 ```bash
-git clone https://github.com/aaswe/codebase-ai.git
-cd aaswe-eng
-npm install
-npm run build
+# API Keys (optional)
+OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
+
+# Neo4j (full mode only)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=aaswe-password
+
+# Analysis settings
+ANALYSIS_DEPTH=comprehensive
+PRESERVE_BUSINESS_CONTEXT=true
 ```
 
-### Testing
+## 🔧 Advanced Usage
 
-```bash
-npm test                # Run all tests (389 tests)
-npm run test:watch      # Watch mode
-npm run test:coverage   # Coverage report
+### Custom Analysis Patterns
+```javascript
+// aaswe.config.js
+module.exports = {
+  analysis: {
+    includePatterns: ['**/*.ts', '**/*.js', '**/*.py'],
+    excludePatterns: ['**/test/**', '**/node_modules/**'],
+    languages: ['typescript', 'javascript', 'python'],
+    depth: 'comprehensive'
+  }
+};
 ```
 
-### Current Test Status
-- ✅ **16/16 test suites passing (100%)**
-- ✅ **389/389 tests passing (100%)**
-- ✅ **Clean TypeScript compilation**
-- ✅ **Production-ready error handling**
+### Business Context Enhancement
+```turtle
+# Add business context to generated TTL files
+@prefix biz: <http://aaswe.org/business#> .
 
-## 📈 Performance & System Requirements
+aide:UserService a aide:Class ;
+    biz:businessDomain "User Management" ;
+    biz:businessRule "Users must have unique email addresses" ;
+    biz:businessProcess "User registration and authentication" .
+```
 
-### Context-Only Mode (Recommended)
-- **RAM**: 4GB minimum, 8GB recommended
-- **CPU**: 2 cores minimum
-- **Storage**: 2GB for knowledge graphs
-- **Network**: Local only (no external dependencies)
+### Docker Customization
+```yaml
+# docker-compose.override.yml
+version: '3.8'
+services:
+  aaswe-server:
+    environment:
+      - CUSTOM_SETTING=value
+    volumes:
+      - ./custom-config:/app/config
+```
 
-### Full Mode (Advanced)
-- **RAM**: 8GB minimum, 16GB recommended
-- **CPU**: 4 cores minimum
-- **Storage**: 5GB for complete system
-- **Network**: Optional API keys for advanced AI features
+## 📊 Monitoring & Health Checks
 
-### Performance Benchmarks
-- **TTL Generation**: < 2 seconds for typical projects
-- **Knowledge Graph Population**: < 5 seconds
-- **MCP Context Loading**: < 1 second
-- **Business Context Preservation**: 100% success rate
+### Health Check Endpoint
+```bash
+curl http://localhost:3001/health
+```
 
-## 🔧 Troubleshooting
+### System Status
+```bash
+# Check all services
+aaswe status
+
+# Docker services
+aaswe docker logs aaswe-server
+```
+
+### Metrics (Full Mode)
+- **Web Interface**: http://localhost:3000
+- **Neo4j Browser**: http://localhost:7474
+- **Metrics Endpoint**: http://localhost:9090/metrics
+
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Port conflicts**
-   ```bash
-   # Check what's using port 3001
-   lsof -i :3001
-   
-   # Use different port
-   aaswe start --port=3002
-   ```
-
-2. **Docker issues** (Full Mode)
-   ```bash
-   # Check Docker status
-   docker ps
-   
-   # View logs
-   docker-compose logs -f aaswe-server
-   
-   # Restart services
-   docker-compose restart
-   ```
-
-3. **Analysis not triggering**
-   ```bash
-   # Check if postinstall hook is working
-   npm run postinstall
-   
-   # Manual analysis
-   aaswe analyze
-   
-   # Debug mode
-   AASWE_DEBUG=true aaswe start --debug
-   ```
-
-4. **Permission errors**
-   ```bash
-   # Fix permissions
-   chmod -R 755 ./data ./knowledge
-   
-   # Check disk space
-   df -h
-   ```
-
-### Debug Mode
-
+#### "Command not found: aaswe"
 ```bash
-# Enable debug logging
-LOG_LEVEL=debug aaswe start --debug
+# Reinstall globally
+npm uninstall -g @aaswe/codebase-ai
+npm install -g @aaswe/codebase-ai
 
-# Check server health
-curl http://localhost:3001/health
-
-# View detailed logs
-aaswe status --verbose
+# Or use npx
+npx @aaswe/codebase-ai --version
 ```
 
-## 🗺️ Roadmap
+#### "Port already in use"
+```bash
+# Use different port
+aaswe start --port 3002
 
-### ✅ Completed (Current Version)
-- **Layer 1-3**: Complete code analysis and AI integration
-- **MCP Server**: Full IDE integration with context enhancement
-- **NPM Package**: Easy deployment and installation
-- **Automatic Analysis**: 7-phase analysis pipeline with business context preservation
-- **Docker Integration**: Complete containerized deployment
-- **Multi-language Support**: TypeScript, JavaScript, Python, Java, Go, Rust, C++
+# Or kill existing process
+lsof -ti:3001 | xargs kill -9
+```
 
-### 🔄 In Progress
-- **Web Interface**: Management dashboard and visualization
-- **Final Integration Testing**: End-to-end system validation
+#### "TTL files not found"
+```bash
+# Re-analyze project
+aaswe analyze --output ./knowledge
 
-### ⏳ Planned
-- **Layer 4**: Advanced code assistance and suggestions
-- **Plugin System**: Extensible architecture for custom analyzers
-- **Team Features**: Multi-user collaboration and shared knowledge
-- **Cloud Deployment**: SaaS offering with enterprise features
+# Check permissions
+ls -la ./knowledge/
+```
+
+#### "Neo4j connection failed"
+```bash
+# Check Neo4j status
+docker-compose ps neo4j
+
+# Restart Neo4j
+docker-compose restart neo4j
+```
+
+### Performance Optimization
+
+#### Large Projects
+```bash
+# Exclude unnecessary files
+aaswe analyze --exclude "**/node_modules/**,**/dist/**"
+
+# Use incremental analysis
+aaswe analyze --incremental
+
+# Limit analysis depth
+aaswe analyze --depth basic
+```
+
+#### Memory Issues
+```bash
+# Increase Node.js memory
+export NODE_OPTIONS="--max-old-space-size=4096"
+aaswe start
+```
+
+## 🏗 Architecture
+
+### Deployment Modes
+
+#### Context-Only Mode
+```
+
+```
+
+#### Full System Mode
+```
+
+```
+
+### Technology Stack
+- **Backend**: Node.js, TypeScript
+- **Knowledge**: RDF/TTL, SPARQL
+- **Database**: Neo4j (optional)
+- **Protocol**: Model Context Protocol (MCP)
+- **Deployment**: Docker, Docker Compose
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Make changes and add tests
-4. Ensure all tests pass: `npm test`
-5. Commit changes: `git commit -am 'Add feature'`
-6. Push branch: `git push origin feature-name`
-7. Submit pull request
+We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
-### Development Guidelines
+### Development Setup
+```bash
+# Clone repository
+git clone https://github.com/aaswe/codebase-ai.git
+cd codebase-ai
 
-- Follow TypeScript best practices
-- Add tests for new features (maintain 100% test success rate)
-- Update documentation
-- Test both Context-Only and Full deployment modes
-- Ensure Docker builds work correctly
+# Install dependencies
+npm install
+
+# Build project
+npm run build
+
+# Run tests
+npm test
+
+# Start development server
+npm run dev
+```
+
+### Running Tests
+```bash
+# All tests
+npm test
+
+# With coverage
+npm run test:coverage
+
+# Watch mode
+npm run test:watch
+```
+
+## 📚 Documentation
+
+- **[Installation Guide](./INSTALLATION.md)** - Detailed setup instructions
+- **[API Documentation](./docs/API.md)** - MCP server API reference
+- **[Architecture Guide](./docs/ARCHITECTURE.md)** - System design and components
+- **[Development Guide](./DEVELOPMENT.md)** - Contributing and development setup
+
+## 🔗 Links
+
+- **GitHub**: https://github.com/aaswe/codebase-ai
+- **NPM Package**: https://www.npmjs.com/package/@aaswe/codebase-ai
+- **Documentation**: https://aaswe.github.io/codebase-ai
+- **Issues**: https://github.com/aaswe/codebase-ai/issues
+- **Discussions**: https://github.com/aaswe/codebase-ai/discussions
 
 ## 📄 License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](./LICENSE) file for details.
 
-## 🆘 Support
+## 🙏 Acknowledgments
 
-- **Issues**: [GitHub Issues](https://github.com/AssahBismarkabah/AIDe/issues)
-- **Documentation**: [Complete Architecture Guide](main/docs/FINAL_SYSTEM_ARCHITECTURE.md)
-- **Discussions**: [GitHub Discussions](https://github.com/AssahBismarkabah/AIDe/discussions)
-- **Quick Reference**: [TTL Files Guide](docs/QUICK_REFERENCE.md)
+- **Model Context Protocol**: For the universal IDE integration standard
+- **Neo4j**: For the powerful graph database
+- **RDF/SPARQL**: For semantic web standards
+- **TypeScript**: For type-safe development
+- **Docker**: For containerization and easy deployment
 
 ---
 
-**Built with ❤️ for developers who want intelligent, context-aware code assistance that runs locally and respects privacy.**
+**Made with ❤️ by the AASWE Team**
 
-🚀 **Get started in 2 minutes**: `npm install -g @aaswe/codebase-ai && aaswe init && aaswe start`
+*Transform your codebase into intelligent context for better AI-assisted development.*

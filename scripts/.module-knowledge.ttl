@@ -1,10 +1,10 @@
 # Enhanced TTL Metadata:
-# Generated: 2025-08-08T17:29:27.802Z
-# Source: /Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/setup.ts
-# Language: typescript
+# Generated: 2025-08-08T17:16:57.640Z
+# Source: /Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/scripts/postinstall.js
+# Language: javascript
 # Classes: 0
 # Functions: 0
-# Dependencies: 7
+# Dependencies: 3
 # Patterns: 0
 #
 
@@ -30,7 +30,7 @@
 # - Business domain indicators based on naming analysis
 # - Quality metrics including complexity and maintainability scores
 #
-# Generated at: 2025-08-08T17:29:27.795Z
+# Generated at: 2025-08-08T17:16:57.640Z
 #
 
 @prefix code: <https://aaswe.ai/ontology/code#>.
@@ -44,15 +44,15 @@
 
 <https://aaswe.ai/ontology/module#.module-knowledge> a code:Module;
     code:name ".module-knowledge";
-    code:language "typescript";
+    code:language "javascript";
     code:version "1.0.0";
-    code:filePath "/Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/setup.ts";
-    code:timestamp "2025-08-08T17:29:27.793Z";
+    code:filePath "/Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/scripts/postinstall.js";
+    code:timestamp "2025-08-08T17:16:57.639Z";
     code:classCount 0;
     code:functionCount 0;
-    code:dependencyCount 7;
+    code:dependencyCount 3;
     code:exportCount 0;
-    code:dependsOn code:dependency_f2d8255ad6e09665, code:dependency_dce7cce055566bed, code:dependency_a0af9f865bf637e6, code:dependency_04311589cba5baf5, code:dependency_72d899901bddc3f4, code:dependency_862417b9e7c3720b, code:dependency_fc2dff6ac3e4ca52;
+    code:dependsOn code:dependency_f2d8255ad6e09665, code:dependency_a0af9f865bf637e6, code:dependency_dce7cce055566bed;
     quality:hasMetrics quality:metrics_177a7ea3611fe6b1;
     business:domainPlaceholder "# Business Domain: E-commerce Order Management\n# Purpose: Handles customer order processing and fulfillment\n# Key Stakeholders: Customers, Sales Team, Fulfillment Team";
     business:businessRulesPlaceholder "# Business Rules:\n# - Order Validation: Orders must have valid payment before processing\n# - Inventory Check: Items must be in stock before order confirmation";
@@ -64,38 +64,18 @@ code:dependency_f2d8255ad6e09665 a code:Dependency;
     code:dependencyType "external";
     code:usage "require";
     business:justification "Supporting library for business functionality".
-code:dependency_dce7cce055566bed a code:Dependency;
-    code:name "fs";
-    code:dependencyType "builtin";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
 code:dependency_a0af9f865bf637e6 a code:Dependency;
     code:name "path";
     code:dependencyType "builtin";
     code:usage "require";
     business:justification "Supporting library for business functionality".
-code:dependency_04311589cba5baf5 a code:Dependency;
-    code:name "./utils/logger";
-    code:dependencyType "internal";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
-code:dependency_72d899901bddc3f4 a code:Dependency;
-    code:name "./config";
-    code:dependencyType "internal";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
-code:dependency_862417b9e7c3720b a code:Dependency;
-    code:name "events";
-    code:dependencyType "external";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
-code:dependency_fc2dff6ac3e4ca52 a code:Dependency;
-    code:name "commander";
-    code:dependencyType "external";
+code:dependency_dce7cce055566bed a code:Dependency;
+    code:name "fs";
+    code:dependencyType "builtin";
     code:usage "require";
     business:justification "Supporting library for business functionality".
 quality:metrics_177a7ea3611fe6b1 a quality:QualityMetrics;
-    quality:cyclomaticComplexity 41;
+    quality:cyclomaticComplexity 18;
     quality:cognitiveComplexity 0;
     quality:maintainability 100;
     quality:testabilityScore "NaN"^^xsd:double;

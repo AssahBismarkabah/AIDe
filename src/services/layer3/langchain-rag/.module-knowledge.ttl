@@ -1,10 +1,10 @@
 # Enhanced TTL Metadata:
-# Generated: 2025-08-08T17:29:27.802Z
-# Source: /Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/setup.ts
+# Generated: 2025-08-08T17:29:28.069Z
+# Source: /Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/services/layer3/langchain-rag/types.ts
 # Language: typescript
 # Classes: 0
 # Functions: 0
-# Dependencies: 7
+# Dependencies: 14
 # Patterns: 0
 #
 
@@ -30,7 +30,7 @@
 # - Business domain indicators based on naming analysis
 # - Quality metrics including complexity and maintainability scores
 #
-# Generated at: 2025-08-08T17:29:27.795Z
+# Generated at: 2025-08-08T17:29:28.068Z
 #
 
 @prefix code: <https://aaswe.ai/ontology/code#>.
@@ -46,56 +46,91 @@
     code:name ".module-knowledge";
     code:language "typescript";
     code:version "1.0.0";
-    code:filePath "/Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/setup.ts";
-    code:timestamp "2025-08-08T17:29:27.793Z";
+    code:filePath "/Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/services/layer3/langchain-rag/types.ts";
+    code:timestamp "2025-08-08T17:29:28.067Z";
     code:classCount 0;
     code:functionCount 0;
-    code:dependencyCount 7;
+    code:dependencyCount 14;
     code:exportCount 0;
-    code:dependsOn code:dependency_f2d8255ad6e09665, code:dependency_dce7cce055566bed, code:dependency_a0af9f865bf637e6, code:dependency_04311589cba5baf5, code:dependency_72d899901bddc3f4, code:dependency_862417b9e7c3720b, code:dependency_fc2dff6ac3e4ca52;
+    code:dependsOn code:dependency_d0b34caf87f69c58, code:dependency_1342f45bac06c682, code:dependency_64f1f16e6b9809d1, code:dependency_8c23486f3dd44d1b, code:dependency_85f3c62643948fb7, code:dependency_c518105449f15f28, code:dependency_e44ee4f995d3b7e9, code:dependency_2131586f44091787, code:dependency_d1dce49d25e8b333, code:dependency_b00a50b63d8cb833, code:dependency_a2bc8611ec03121a, code:dependency_da2f073e06f78938, code:dependency_d0165df725930573, code:dependency_03d8b14871684557;
     quality:hasMetrics quality:metrics_177a7ea3611fe6b1;
     business:domainPlaceholder "# Business Domain: E-commerce Order Management\n# Purpose: Handles customer order processing and fulfillment\n# Key Stakeholders: Customers, Sales Team, Fulfillment Team";
     business:businessRulesPlaceholder "# Business Rules:\n# - Order Validation: Orders must have valid payment before processing\n# - Inventory Check: Items must be in stock before order confirmation";
     business:useCasesPlaceholder "# Use Cases:\n# - Place Order: Customer creates new order with items\n# - Process Payment: System validates and processes payment";
     business:qualityAttributesPlaceholder "# Quality Attributes:\n# - Performance: Order processing < 2 seconds\n# - Reliability: 99.9% uptime\n# - Security: PCI DSS compliance for payment data";
     business:constraintsPlaceholder "# Constraints:\n# - Technical: Must integrate with legacy ERP system\n# - Business: Maximum 5% cart abandonment rate\n# - Regulatory: GDPR compliance for customer data".
-code:dependency_f2d8255ad6e09665 a code:Dependency;
-    code:name "child_process";
+code:dependency_d0b34caf87f69c58 a code:Dependency;
+    code:name "@langchain/core/documents";
     code:dependencyType "external";
     code:usage "require";
     business:justification "Supporting library for business functionality".
-code:dependency_dce7cce055566bed a code:Dependency;
-    code:name "fs";
+code:dependency_1342f45bac06c682 a code:Dependency;
+    code:name "@langchain/core/retrievers";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_64f1f16e6b9809d1 a code:Dependency;
+    code:name "@langchain/core/language_models/base";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_8c23486f3dd44d1b a code:Dependency;
+    code:name "@langchain/core/vectorstores";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_85f3c62643948fb7 a code:Dependency;
+    code:name "@langchain/core/embeddings";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_c518105449f15f28 a code:Dependency;
+    code:name "@langchain/core/prompts";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_e44ee4f995d3b7e9 a code:Dependency;
+    code:name "@langchain/core/runnables";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_2131586f44091787 a code:Dependency;
+    code:name "@langchain/core/output_parsers";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_d1dce49d25e8b333 a code:Dependency;
+    code:name "langchain/vectorstores/memory";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_b00a50b63d8cb833 a code:Dependency;
+    code:name "@langchain/openai";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_a2bc8611ec03121a a code:Dependency;
+    code:name "langchain/text_splitter";
+    code:dependencyType "external";
+    code:usage "require";
+    business:justification "Supporting library for business functionality".
+code:dependency_da2f073e06f78938 a code:Dependency;
+    code:name "crypto";
     code:dependencyType "builtin";
     code:usage "require";
     business:justification "Supporting library for business functionality".
-code:dependency_a0af9f865bf637e6 a code:Dependency;
-    code:name "path";
-    code:dependencyType "builtin";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
-code:dependency_04311589cba5baf5 a code:Dependency;
-    code:name "./utils/logger";
+code:dependency_d0165df725930573 a code:Dependency;
+    code:name "../../../utils/logger";
     code:dependencyType "internal";
     code:usage "require";
     business:justification "Supporting library for business functionality".
-code:dependency_72d899901bddc3f4 a code:Dependency;
-    code:name "./config";
+code:dependency_03d8b14871684557 a code:Dependency;
+    code:name "./types";
     code:dependencyType "internal";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
-code:dependency_862417b9e7c3720b a code:Dependency;
-    code:name "events";
-    code:dependencyType "external";
-    code:usage "require";
-    business:justification "Supporting library for business functionality".
-code:dependency_fc2dff6ac3e4ca52 a code:Dependency;
-    code:name "commander";
-    code:dependencyType "external";
     code:usage "require";
     business:justification "Supporting library for business functionality".
 quality:metrics_177a7ea3611fe6b1 a quality:QualityMetrics;
-    quality:cyclomaticComplexity 41;
+    quality:cyclomaticComplexity 84;
     quality:cognitiveComplexity 0;
     quality:maintainability 100;
     quality:testabilityScore "NaN"^^xsd:double;

@@ -6,6 +6,7 @@
 import { simpleGit, StatusResult } from 'simple-git';
 import { EventEmitter } from 'events';
 import { existsSync } from 'fs';
+import * as path from 'path';
 import logger from '../../../utils/logger';
 import {
   Repository,
@@ -382,17 +383,32 @@ export class GitService extends EventEmitter {
       const configPath = '.aaswe/repositories.json';
       
       if (!existsSync(configPath)) {
-        logger.debug('No repository configuration file found, starting with empty collection');
+        logger.debug('No repository configuration file found, auto-detecting current project');
+        await this.autoDetectCurrentProject();
         return;
       }
 
       const configData = await readFile(configPath, 'utf-8');
       const repositoriesData = JSON.parse(configData);
       
+      // Only load repositories that still exist on disk
       for (const repoData of repositoriesData.repositories || []) {
-        // Validate repository data
+        // Validate repository data and check if path exists
         if (!repoData.id || !repoData.name || !repoData.path) {
-          logger.warn(`Invalid repository data found in config: ${JSON.stringify(repoData)}`);
+          logger.debug(`Invalid repository data found in config: ${JSON.stringify(repoData)}`);
+          continue;
+        }
+
+        // Check if repository path still exists
+        if (!existsSync(repoData.path)) {
+          logger.debug(`Repository path no longer exists, skipping: ${repoData.path}`);
+          continue;
+        }
+
+        // Only load if it's the current project directory or a subdirectory
+        const currentDir = process.cwd();
+        if (!repoData.path.startsWith(currentDir) && !currentDir.startsWith(repoData.path)) {
+          logger.debug(`Repository not related to current project, skipping: ${repoData.path}`);
           continue;
         }
 
@@ -422,10 +438,16 @@ export class GitService extends EventEmitter {
         this.repositories.set(repository.id, repository);
       }
 
-      logger.info(`Loaded ${this.repositories.size} repositories from configuration`);
+      logger.info(`Loaded ${this.repositories.size} valid repositories from configuration`);
+      
+      // If no valid repositories found, auto-detect current project
+      if (this.repositories.size === 0) {
+        await this.autoDetectCurrentProject();
+      }
     } catch (error) {
       logger.error('Failed to load repositories from storage:', error);
-      // Continue with empty collection rather than failing
+      // Fallback to auto-detection
+      await this.autoDetectCurrentProject();
     }
   }
 
@@ -437,15 +459,28 @@ export class GitService extends EventEmitter {
       const configDir = '.aaswe';
       const configPath = `${configDir}/repositories.json`;
       
+      // Only save if we have repositories and they're valid
+      if (this.repositories.size === 0) {
+        logger.debug('No repositories to save');
+        return;
+      }
+
       // Ensure config directory exists
       if (!existsSync(configDir)) {
         await mkdir(configDir, { recursive: true });
       }
 
+      // Only save repositories that are related to the current project
+      const currentDir = process.cwd();
+      const validRepos = Array.from(this.repositories.values()).filter(repo =>
+        repo.path.startsWith(currentDir) || currentDir.startsWith(repo.path)
+      );
+
       const repositoriesData = {
         version: '1.0.0',
         lastUpdated: new Date().toISOString(),
-        repositories: Array.from(this.repositories.values()).map(repo => ({
+        projectRoot: currentDir,
+        repositories: validRepos.map(repo => ({
           id: repo.id,
           name: repo.name,
           path: repo.path,
@@ -459,9 +494,70 @@ export class GitService extends EventEmitter {
       };
 
       await writeFile(configPath, JSON.stringify(repositoriesData, null, 2), 'utf-8');
-      logger.debug(`Saved ${this.repositories.size} repositories to configuration`);
+      logger.debug(`Saved ${validRepos.length} project repositories to configuration`);
     } catch (error) {
       logger.error('Failed to save repositories to storage:', error);
+    }
+  }
+
+  /**
+   * Auto-detect and add the current project as a repository
+   */
+  private async autoDetectCurrentProject(): Promise<void> {
+    try {
+      const currentDir = process.cwd();
+      const repoGit = simpleGit(currentDir);
+      
+      // Check if current directory is a Git repository
+      const isRepo = await repoGit.checkIsRepo();
+      if (!isRepo) {
+        logger.debug('Current directory is not a Git repository, skipping auto-detection');
+        return;
+      }
+
+      // Get repository information
+      const status = await repoGit.status();
+      const log = await repoGit.log(['-1']);
+      const remotes = await repoGit.getRemotes(true);
+      
+      const projectName = path.basename(currentDir);
+      const originUrl = remotes.find(r => r.name === 'origin')?.refs?.fetch;
+      
+      const repository: Repository = {
+        id: `${projectName}-${Date.now()}`,
+        name: projectName,
+        path: currentDir,
+        branch: status.current || 'main',
+        status: 'active',
+        config: {
+          includePatterns: ['**/*.ts', '**/*.js', '**/*.py', '**/*.java', '**/*.go', '**/*.rs', '**/*.cpp'],
+          excludePatterns: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '**/*.test.*', '**/*.spec.*'],
+          languages: ['typescript', 'javascript', 'python', 'java', 'go', 'rust', 'cpp'],
+          enableWebhooks: false,
+          enableFileWatcher: true,
+          batchSize: 100,
+          analysisDepth: 10
+        }
+      };
+
+      // Add optional fields if they exist
+      if (originUrl) {
+        repository.url = originUrl;
+      }
+      if (log.latest?.hash) {
+        repository.lastCommitHash = log.latest.hash;
+      }
+
+      this.repositories.set(repository.id, repository);
+      await this.saveRepositories();
+      
+      logger.info('Auto-detected current project as repository', {
+        name: repository.name,
+        path: repository.path,
+        branch: repository.branch
+      });
+    } catch (error) {
+      logger.debug('Failed to auto-detect current project', { error });
     }
   }
 

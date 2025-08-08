@@ -46,6 +46,11 @@ coverage/
 
 # nyc test coverage
 .nyc_output
+final-validation/
+final-validation-git/
+final-test/
+neo4j-test/
+full-test/
 
 # Dependency directories
 jspm_packages/
@@ -70,6 +75,7 @@ jspm_packages/
 backups/
 data/
 knowledge/
+clean-knowledge/
 test-knowledge/
 
 # Docker volumes and data

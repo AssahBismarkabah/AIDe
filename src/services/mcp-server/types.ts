@@ -34,6 +34,8 @@ export interface MCPServerConfig {
     watchDebounce: number;
     maxFileSize: number;
     encoding: string;
+    directories?: string[]; // Custom directories to scan for TTL files
+    patterns?: string[]; // Custom patterns for TTL files
   };
 
   // Integration settings

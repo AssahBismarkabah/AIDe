@@ -32,7 +32,9 @@ export function createDefaultMCPConfig(): MCPServerConfig {
       watchEnabled: true,
       watchDebounce: 1000,
       maxFileSize: 1024 * 1024, // 1MB
-      encoding: 'utf-8'
+      encoding: 'utf-8',
+      directories: ['./clean-knowledge', './.aaswe/knowledge', './knowledge'], // Default TTL directories
+      patterns: ['**/*.module-knowledge.ttl', '**/*.ttl'] // TTL file patterns
     },
     integration: {
       layer3Config: {

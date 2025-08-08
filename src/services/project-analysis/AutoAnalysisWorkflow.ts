@@ -90,12 +90,92 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       languages: ['typescript', 'javascript', 'python', 'java'],
       includePatterns: ['**/*.ts', '**/*.js', '**/*.py', '**/*.java'],
       excludePatterns: [
+        // General build/dependency directories
         '**/node_modules/**',
         '**/.git/**',
         '**/dist/**',
         '**/build/**',
+        '**/out/**',
+        '**/target/**',
+        '**/bin/**',
+        '**/obj/**',
+        '**/lib/**',
+        '**/libs/**',
+        
+        // Python
+        '**/venv/**',
+        '**/env/**',
+        '**/.venv/**',
+        '**/.env/**',
+        '**/site-packages/**',
+        '**/__pycache__/**',
+        '**/*.pyc',
+        '**/*.pyo',
+        '**/*.pyd',
+        '**/pip-log.txt',
+        '**/pip-delete-this-directory.txt',
+        
+        // Java
+        '**/target/**',
+        '**/.m2/**',
+        '**/.gradle/**',
+        '**/gradle/**',
+        '**/gradlew*',
+        '**/*.class',
+        '**/*.jar',
+        '**/*.war',
+        '**/*.ear',
+        
+        // .NET/C#
+        '**/bin/**',
+        '**/obj/**',
+        '**/packages/**',
+        '**/*.dll',
+        '**/*.exe',
+        '**/*.pdb',
+        
+        // Go
+        '**/vendor/**',
+        '**/*.exe',
+        
+        // Rust
+        '**/target/**',
+        '**/Cargo.lock',
+        
+        // C/C++
+        '**/*.o',
+        '**/*.so',
+        '**/*.dylib',
+        '**/*.a',
+        
+        // IDE and editor files
+        '**/.vscode/**',
+        '**/.idea/**',
+        '**/*.swp',
+        '**/*.swo',
+        '**/*~',
+        
+        // Test and coverage
         '**/*.test.*',
-        '**/*.spec.*'
+        '**/*.spec.*',
+        '**/test/**',
+        '**/tests/**',
+        '**/coverage/**',
+        '**/.nyc_output/**',
+        
+        // Temporary and cache
+        '**/tmp/**',
+        '**/temp/**',
+        '**/.cache/**',
+        '**/cache/**',
+        
+        // OS files
+        '**/.DS_Store',
+        '**/Thumbs.db',
+        
+        // Logs
+        '**/*.log',
+        '**/logs/**'
       ],
       ...config
     };
@@ -202,7 +282,24 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       let knowledgeGraphStats = { nodes: 0, relationships: 0 };
       if (this.config.enableKnowledgeGraphPopulation) {
         logger.info('Phase 4: Populating knowledge graph');
-        knowledgeGraphStats = await this.populateKnowledgeGraph(ttlResults);
+        try {
+          // Check if Neo4j is available before attempting population
+          const neo4jAvailable = await this.checkNeo4jAvailability();
+          
+          if (neo4jAvailable) {
+            knowledgeGraphStats = await this.populateKnowledgeGraph(ttlResults);
+            logger.info('✅ Knowledge graph populated successfully');
+          } else {
+            logger.warn('⚠️  Neo4j not available - skipping knowledge graph population');
+            logger.info('💡 To enable Neo4j: Set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD in .env.aaswe');
+            // Still count entities for statistics from TTL files
+            knowledgeGraphStats = await this.populateKnowledgeGraph(ttlResults);
+          }
+        } catch (error) {
+          logger.error('❌ Knowledge graph population failed', { error });
+          logger.info('💡 TTL files generated successfully - knowledge graph population is optional');
+          // Don't fail the entire workflow for Neo4j issues
+        }
       }
       
       // Phase 5: Load MCP context
@@ -539,6 +636,9 @@ export class AutoAnalysisWorkflow extends EventEmitter {
           modulePath
         );
         
+        // Write TTL file to the specified output directory
+        await this.writeTTLToOutputDirectory(modulePath, rdfResult);
+        
         ttlResults.set(modulePath, rdfResult);
         
         logger.info('Enhanced TTL generated for module', {
@@ -621,6 +721,39 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     let totalNodes = 0;
     let totalRelationships = 0;
     
+    // Check if Neo4j is available before attempting population
+    const neo4jAvailable = await this.checkNeo4jAvailability();
+    if (!neo4jAvailable) {
+      logger.info('Neo4j not available, skipping knowledge graph population');
+      logger.info('TTL files generated successfully and can be used by MCP servers');
+      
+      // Still count entities for statistics
+      for (const [ttlPath, result] of ttlResults) {
+        try {
+          const content = result.rdfContent;
+          const classMatches = content.match(/aide:Class/g) || [];
+          const methodMatches = content.match(/aide:Method/g) || [];
+          const functionMatches = content.match(/aide:Function/g) || [];
+          const dependencyMatches = content.match(/aide:dependsOn/g) || [];
+          const extendsMatches = content.match(/aide:extends/g) || [];
+          
+          const nodes = classMatches.length + methodMatches.length + functionMatches.length;
+          const relationships = dependencyMatches.length + extendsMatches.length;
+          
+          totalNodes += nodes;
+          totalRelationships += relationships;
+          
+          logger.debug('Counted entities in TTL', { ttlPath, nodes, relationships });
+          
+        } catch (error) {
+          logger.warn('Failed to count entities in TTL', { ttlPath, error });
+        }
+      }
+      
+      return { nodes: totalNodes, relationships: totalRelationships };
+    }
+    
+    // Neo4j is available, proceed with population
     for (const [ttlPath, result] of ttlResults) {
       try {
         // Parse TTL content and extract entities
@@ -794,6 +927,43 @@ export class AutoAnalysisWorkflow extends EventEmitter {
 
   // Helper methods for the implemented functionality
 
+  /**
+   * Check if Neo4j is available for knowledge graph operations
+   */
+  private async checkNeo4jAvailability(): Promise<boolean> {
+    try {
+      // Check if Neo4j environment variables are set
+      const neo4jUri = process.env.NEO4J_URI;
+      const neo4jUsername = process.env.NEO4J_USERNAME;
+      const neo4jPassword = process.env.NEO4J_PASSWORD;
+
+      if (!neo4jUri || !neo4jUsername || !neo4jPassword) {
+        logger.debug('Neo4j credentials not configured');
+        return false;
+      }
+
+      // Try to connect to Neo4j directly
+      const { Neo4jDatabaseService } = await import('../layer2/neo4j-database/Neo4jDatabaseService');
+      const neo4jService = new Neo4jDatabaseService();
+
+      const config = {
+        uri: neo4jUri,
+        username: neo4jUsername,
+        password: neo4jPassword,
+        database: 'neo4j'
+      };
+
+      await neo4jService.connect(config);
+      const isHealthy = await neo4jService.testConnection();
+      await neo4jService.disconnect();
+
+      return isHealthy;
+    } catch (error) {
+      logger.debug('Neo4j availability check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      return false;
+    }
+  }
+
   private async createKnowledgeGraphEntities(_ttlPath: string, content: string, nodes: number, relationships: number): Promise<void> {
     const moduleId = this.extractModuleIdFromTTL(content);
     
@@ -887,6 +1057,38 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     await fs.writeFile(cacheFile, JSON.stringify(context, null, 2), 'utf8');
     
     logger.debug('Updated MCP context for module', { moduleId });
+  }
+
+  /**
+   * Write TTL content to the specified output directory
+   */
+  private async writeTTLToOutputDirectory(modulePath: string, rdfResult: any): Promise<void> {
+    try {
+      // Create output directory if it doesn't exist
+      await fs.mkdir(this.config.outputDirectory, { recursive: true });
+      
+      // Generate output file name based on module path
+      // modulePath is like "src/services/.module-knowledge.ttl"
+      const moduleDir = path.dirname(modulePath);
+      const moduleDirName = path.basename(moduleDir);
+      const outputFileName = `${moduleDirName}.module-knowledge.ttl`;
+      const outputPath = path.join(this.config.outputDirectory, outputFileName);
+      
+      // Write TTL content to output file
+      await fs.writeFile(outputPath, rdfResult.rdfContent, 'utf8');
+      
+      logger.info('TTL file written to output directory', {
+        modulePath,
+        outputPath,
+        moduleDir,
+        moduleDirName,
+        size: rdfResult.size
+      });
+      
+    } catch (error) {
+      logger.error('Failed to write TTL to output directory', { modulePath, error });
+      throw error;
+    }
   }
 
   private getLanguageFromFile(filePath: string): 'typescript' | 'javascript' | 'python' | 'java' | 'go' | 'rust' | 'cpp' {

@@ -842,7 +842,22 @@ export class MCPServer extends EventEmitter {
    * Initialize TTL file watcher
    */
   private async initializeTTLWatcher(): Promise<void> {
-    this.fileWatcher = watch('**/*.module-knowledge.ttl', {
+    const directories = this.config.ttl.directories || ['./'];
+    const patterns = this.config.ttl.patterns || ['**/*.module-knowledge.ttl'];
+    
+    // Create watch patterns for all directories and patterns
+    const watchPatterns: string[] = [];
+    for (const directory of directories) {
+      for (const pattern of patterns) {
+        // Combine directory and pattern
+        const watchPattern = directory === './' ? pattern : `${directory}/${pattern}`;
+        watchPatterns.push(watchPattern);
+      }
+    }
+    
+    logger.info('Initializing TTL file watcher', { watchPatterns });
+    
+    this.fileWatcher = watch(watchPatterns, {
       ignored: /node_modules/,
       persistent: true,
       ignoreInitial: false
@@ -852,7 +867,7 @@ export class MCPServer extends EventEmitter {
     this.fileWatcher.on('change', (path) => this.handleFileEvent('modified', path));
     this.fileWatcher.on('unlink', (path) => this.handleFileEvent('deleted', path));
 
-    logger.info('TTL file watcher initialized');
+    logger.info('TTL file watcher initialized', { patterns: watchPatterns });
   }
 
   /**
@@ -889,17 +904,39 @@ export class MCPServer extends EventEmitter {
     try {
       logger.info('Loading TTL files...');
       
-      // Scan for TTL files in the project
-      const ttlPattern = '**/*.module-knowledge.ttl';
-      const ttlFiles = await glob(ttlPattern, {
-        ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
-        absolute: true
-      });
+      const allTTLFiles: string[] = [];
       
-      logger.info(`Found ${ttlFiles.length} TTL files to load`);
+      // Use custom directories and patterns from config
+      const directories = this.config.ttl.directories || ['./'];
+      const patterns = this.config.ttl.patterns || ['**/*.module-knowledge.ttl'];
+      
+      logger.info('Scanning TTL directories', { directories, patterns });
+      
+      // Scan each directory with each pattern
+      for (const directory of directories) {
+        for (const pattern of patterns) {
+          try {
+            const ttlFiles = await glob(pattern, {
+              cwd: directory,
+              ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
+              absolute: true
+            });
+            
+            allTTLFiles.push(...ttlFiles);
+            logger.debug(`Found ${ttlFiles.length} TTL files in ${directory} with pattern ${pattern}`);
+          } catch (error) {
+            logger.warn(`Failed to scan directory ${directory} with pattern ${pattern}`, { error });
+          }
+        }
+      }
+      
+      // Remove duplicates
+      const uniqueTTLFiles = [...new Set(allTTLFiles)];
+      
+      logger.info(`Found ${uniqueTTLFiles.length} TTL files to load`);
       
       // Load each TTL file
-      const loadPromises = ttlFiles.map(filePath => this.loadTTLFile(filePath));
+      const loadPromises = uniqueTTLFiles.map(filePath => this.loadTTLFile(filePath));
       await Promise.allSettled(loadPromises);
       
       this.metrics.context.ttlFilesLoaded = this.ttlFiles.size;

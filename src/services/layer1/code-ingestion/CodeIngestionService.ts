@@ -71,6 +71,9 @@ export class CodeIngestionService extends EventEmitter {
     // Initialize services
     this.gitService = new GitService();
     this.fileWatcher = new FileWatcher();
+    
+    // GitService now supports single-project tracking with auto-detection
+    // It will automatically detect and track the current project repository
     this.jobQueue = new IngestionJobQueue(this.config);
   }
 

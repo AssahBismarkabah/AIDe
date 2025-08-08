@@ -60,7 +60,10 @@
     "docker-compose.yml",
     "Dockerfile",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "INSTALLATION.md",
+    ".env.example",
+    "scripts/quick-start.sh"
   ],
   "dependencies": {
     "@langchain/anthropic": "^0.3.0",
@@ -70,12 +73,15 @@
     "@types/uuid": "^10.0.0",
     "chokidar": "^4.0.1",
     "commander": "^12.1.0",
+    "dependency-cruiser": "^17.0.1",
     "dotenv": "^16.6.1",
     "glob": "^11.0.0",
+    "java-parser": "^3.0.1",
     "langchain": "^0.3.0",
     "neo4j-driver": "^5.27.0",
     "rdflib": "^2.2.35",
     "simple-git": "^3.25.0",
+    "ts-morph": "^26.0.0",
     "uuid": "^10.0.0",
     "winston": "^3.17.0",
     "ws": "^8.18.0"
@@ -88,6 +94,8 @@
     "@typescript-eslint/parser": "^8.18.1",
     "eslint": "^9.17.0",
     "jest": "^29.7.0",
+    "jest-util": "^30.0.5",
+    "redis": "^5.8.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"

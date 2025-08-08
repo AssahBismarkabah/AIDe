@@ -74,7 +74,7 @@ export class Neo4jDatabaseService extends EventEmitter implements
         maxConnectionPoolSize: config.maxConnectionPoolSize || 50,
         connectionTimeout: config.connectionTimeout || 30000,
         maxTransactionRetryTime: config.maxTransactionRetryTime || 30000,
-        encrypted: config.encrypted !== false,
+        encrypted: config.encrypted || false, // Default to false for local development
         trust: config.trust || 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES'
       });
 
@@ -385,8 +385,11 @@ export class Neo4jDatabaseService extends EventEmitter implements
           const nodeId = this.extractNodeId(triple.subject);
           const nodeLabel = this.extractNodeLabel(triple.object);
           
+          // Clean node label for Cypher (remove namespace prefixes and make valid identifier)
+          const cleanLabel = nodeLabel.replace(/^[^:]*:/, '').replace(/[^a-zA-Z0-9_]/g, '_');
+          
           const cypherQuery = `
-            MERGE (n:${nodeLabel} {id: $nodeId})
+            MERGE (n:\`${cleanLabel}\` {id: $nodeId})
             SET n.sourceFile = $sourceFile,
                 n.lastUpdated = datetime()
             RETURN n
@@ -455,10 +458,18 @@ export class Neo4jDatabaseService extends EventEmitter implements
           const targetId = this.extractNodeId(triple.object);
           const relationshipType = this.extractRelationshipType(triple.predicate);
           
+          // Clean relationship type for Cypher (remove namespace prefixes and make valid identifier)
+          let cleanRelType = relationshipType.replace(/^[^:]*:/, '').replace(/[^a-zA-Z0-9_]/g, '_');
+          
+          // Additional validation to ensure non-empty relationship type
+          if (!cleanRelType || cleanRelType.trim() === '') {
+            cleanRelType = 'RELATED_TO';
+          }
+          
           const cypherQuery = `
             MATCH (source {id: $sourceId})
             MATCH (target {id: $targetId})
-            MERGE (source)-[r:${relationshipType}]->(target)
+            MERGE (source)-[r:\`${cleanRelType}\`]->(target)
             SET r.sourceFile = $sourceFile,
                 r.lastUpdated = datetime()
             RETURN r
@@ -1034,7 +1045,29 @@ export class Neo4jDatabaseService extends EventEmitter implements
     // Extract relationship type from predicate
     const cleaned = predicate.replace(/[<>]/g, '');
     const parts = cleaned.split('#');
-    return parts[parts.length - 1] || 'RELATED_TO';
+    let relationshipType = parts[parts.length - 1] || 'RELATED_TO';
+    
+    // Handle cases where the predicate might be a namespace prefix only
+    if (!relationshipType || relationshipType.trim() === '') {
+      // Try splitting by colon as well
+      const colonParts = cleaned.split(':');
+      relationshipType = colonParts[colonParts.length - 1] || 'RELATED_TO';
+    }
+    
+    // Ensure we have a valid non-empty relationship type
+    if (!relationshipType || relationshipType.trim() === '') {
+      relationshipType = 'RELATED_TO';
+    }
+    
+    // Clean the relationship type for Cypher compatibility
+    relationshipType = relationshipType.replace(/[^a-zA-Z0-9_]/g, '_');
+    
+    // Ensure it doesn't start with a number
+    if (/^[0-9]/.test(relationshipType)) {
+      relationshipType = 'REL_' + relationshipType;
+    }
+    
+    return relationshipType;
   }
 
   private suggestIndexHints(query: string): { optimizedQuery: string } | null {
