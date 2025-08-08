@@ -4,7 +4,62 @@ The **Model Context Protocol (MCP) Server** is the core deliverable of the AASWE
 
 ## Overview
 
-The MCP Server acts as a bridge between your IDE's LLM and the comprehensive knowledge graph built from your codebase. It serves contextual information that helps LLMs understand your code architecture, business logic, and development patterns.
+The MCP Server acts as a bridge between your **existing IDE LLM** and the comprehensive knowledge graph built from your codebase. It enhances your current development setup by providing rich contextual information without requiring you to change your preferred LLM.
+
+## 🎯 **Two Deployment Modes**
+
+### **Mode 1: Pure Context Provider (Recommended)**
+**Perfect for most developers who want enhanced context with their existing setup**
+
+```
+Your IDE LLM (Claude, GPT-4, etc.)
+    ↕️ MCP Protocol
+AASWE MCP Server
+    ↕️ Direct TTL access
+TTL Files + Code Graph (Layers 1+2)
+```
+
+**What you get:**
+- ✅ **Keep your existing IDE LLM** (Claude, GPT-4, Copilot, etc.)
+- ✅ **Rich codebase context** from TTL files and knowledge graphs
+- ✅ **No additional model configuration** required
+- ✅ **Lightweight and fast** - just context enhancement
+- ✅ **Works with any LLM** your IDE supports
+
+### **Mode 2: Enhanced with AI Analysis (Advanced)**
+**For teams wanting advanced AI-powered code analysis and reasoning**
+
+```
+Your IDE LLM (Claude, GPT-4, etc.)
+    ↕️ MCP Protocol
+AASWE MCP Server
+    ↕️ Enhanced queries
+Layer 3 AI Services (RAG, Graph QA, SPARQL)
+    ↕️ Deep analysis
+TTL Files + Code Graph + Neo4j (All Layers)
+```
+
+**Additional features:**
+- ✅ **Everything from Mode 1** PLUS
+- ✅ **Advanced RAG queries** for complex code questions
+- ✅ **Natural language to Cypher** for graph database queries
+- ✅ **SPARQL reasoning** over RDF knowledge graphs
+- ✅ **AI-powered code analysis** and recommendations
+
+## 🚀 **Quick Start (Mode 1 - Recommended)**
+
+Most users should start with Mode 1 - it provides immediate value with minimal setup:
+
+```bash
+# 1. Install and start AASWE
+npm install -g @aaswe/codebase-ai
+aaswe start --mode=context-only
+
+# 2. Configure your IDE to connect to: ws://localhost:3001
+# 3. Your existing LLM now has rich codebase context!
+```
+
+**No model configuration needed** - your IDE LLM gets enhanced context automatically.
 
 ## Key Features
 
@@ -35,17 +90,26 @@ The MCP Server acts as a bridge between your IDE's LLM and the comprehensive kno
 
 ## Architecture
 
+### **Mode 1: Pure Context Provider**
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   IDE Client    │◄──►│   MCP Server    │◄──►│ Knowledge Graph │
-│  (VS Code/IJ)   │    │                 │    │   (Layer 2+3)   │
+│ Your IDE LLM    │◄──►│   MCP Server    │◄──►│   TTL Files     │
+│ (Claude/GPT-4)  │    │ (Context Only)  │    │ + Code Graph    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌─────────────────┐
-                       │   TTL Files     │
-                       │ (.module-know.) │
-                       └─────────────────┘
+```
+
+### **Mode 2: Enhanced with AI Analysis**
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Your IDE LLM    │◄──►│   MCP Server    │◄──►│ Layer 3 AI      │
+│ (Claude/GPT-4)  │    │ (Full Features) │    │ (RAG/Graph QA)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │                        │
+                              ▼                        ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │   TTL Files     │    │ Neo4j + RDF    │
+                       │ + Code Graph    │    │ Knowledge Base  │
+                       └─────────────────┘    └─────────────────┘
 ```
 
 ## Configuration

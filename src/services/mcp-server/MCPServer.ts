@@ -77,11 +77,25 @@ export class MCPServer extends EventEmitter {
     hybridStorage;
     this.metrics = this.initializeMetrics();
     
-    // Create HTTP server
-    this.server = createServer();
+    // Create HTTP server with health endpoint
+    this.server = createServer((req, res) => {
+      if (req.url === '/health' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'healthy',
+          uptime: this.status === 'running' ? Date.now() - this.startTime : 0,
+          connections: this.connections.size,
+          ttlFiles: this.ttlFiles.size,
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      }
+    });
     
     // Create WebSocket server
-    this.wsServer = new WebSocketServer({ 
+    this.wsServer = new WebSocketServer({
       server: this.server,
       maxPayload: 1024 * 1024 // 1MB max payload
     });

@@ -1,101 +1,114 @@
 {
-	"name": "@aide/codebase-ai",
-	"version": "1.0.0",
-	"description": "AI-Assisted Software Engineering with local Docker stack for enhanced IDE LLM interactions",
-	"main": "dist/index.js",
-	"bin": {
-		"aide": "dist/cli.js"
-	},
-	"scripts": {
-		"build": "tsc",
-		"dev": "tsc --watch",
-		"start": "node dist/index.js",
-		"docker:up": "docker-compose -f docker-compose.local.yml up -d",
-		"docker:down": "docker-compose -f docker-compose.local.yml down",
-		"docker:logs": "docker-compose -f docker-compose.local.yml logs -f",
-		"docker:status": "docker-compose -f docker-compose.local.yml ps",
-		"test": "jest --passWithNoTests",
-		"test:watch": "jest --watch",
-		"test:coverage": "jest --coverage",
-		"lint": "eslint src/**/*.ts",
-		"lint:fix": "eslint src/**/*.ts --fix"
-	},
-	"keywords": [
-		"ai",
-		"software-engineering",
-		"code-analysis",
-		"llm",
-		"ide-integration",
-		"knowledge-graph",
-		"mcp",
-		"docker"
-	],
-	"author": "AIDe Team",
-	"license": "MIT",
-	"files": [
-		"dist/",
-		"docker-compose.local.yml",
-		"services/",
-		"schemas/",
-		"templates/"
-	],
-	"dependencies": {
-		"@anthropic-ai/sdk": "^0.58.0",
-		"@babel/parser": "^7.28.0",
-		"@babel/traverse": "^7.28.0",
-		"@babel/types": "^7.28.2",
-		"@langchain/anthropic": "^0.3.26",
-		"@langchain/community": "^0.3.50",
-		"@langchain/core": "^0.3.67",
-		"@langchain/openai": "^0.6.4",
-		"@modelcontextprotocol/sdk": "^1.17.1",
-		"@types/rdflib": "^0.20.1",
-		"@typescript-eslint/parser": "^8.39.0",
-		"@typescript-eslint/typescript-estree": "^8.39.0",
-		"anthropic": "^0.0.0",
-		"chokidar": "^4.0.3",
-		"commander": "^14.0.0",
-		"dotenv": "^17.2.1",
-		"fast-glob": "^3.3.3",
-		"fastify": "^5.4.0",
-		"glob": "^11.0.3",
-		"java-parser": "^3.0.1",
-		"langchain": "^0.3.30",
-		"micromatch": "^4.0.8",
-		"n3": "^1.26.0",
-		"neo4j-driver": "^5.28.1",
-		"openai": "^5.12.0",
-		"rdflib": "^2.2.37",
-		"redis": "^5.8.0",
-		"simple-git": "^3.28.0",
-		"tiktoken": "^1.0.21",
-		"uuid": "^11.1.0",
-		"winston": "^3.17.0",
-		"ws": "^8.18.3",
-		"yaml": "^2.8.1"
-	},
-	"devDependencies": {
-		"@types/babel__parser": "^7.1.1",
-		"@types/babel__traverse": "^7.20.4",
-		"@types/jest": "^30.0.0",
-		"@types/node": "^24.2.0",
-		"@types/ws": "^8.18.1",
-		"@typescript-eslint/eslint-plugin": "^8.39.0",
-		"eslint": "^9.32.0",
-		"jest": "^30.0.5",
-		"ts-jest": "^29.4.1",
-		"typescript": "^5.9.2"
-	},
-	"engines": {
-		"node": ">=18.0.0",
-		"npm": ">=8.0.0"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/aide/codebase-ai.git"
-	},
-	"bugs": {
-		"url": "https://github.com/aide/codebase-ai/issues"
-	},
-	"homepage": "https://github.com/aide/codebase-ai#readme"
+  "name": "@aaswe/codebase-ai",
+  "version": "1.0.0",
+  "description": "AI-Assisted Software Engineering (AASWE) - Rich codebase context for IDE LLMs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "aaswe": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build",
+    "docker:build": "docker build -t aaswe/codebase-ai .",
+    "docker:run": "docker run -p 3001:3001 -p 7474:7474 -p 7687:7687 aaswe/codebase-ai",
+    "docker:compose": "docker-compose up -d",
+    "docker:compose:down": "docker-compose down",
+    "docker:compose:logs": "docker-compose logs -f"
+  },
+  "keywords": [
+    "ai",
+    "software-engineering",
+    "ide",
+    "llm",
+    "context",
+    "knowledge-graph",
+    "mcp",
+    "model-context-protocol",
+    "code-analysis",
+    "rdf",
+    "ttl",
+    "neo4j",
+    "rag",
+    "sparql",
+    "cypher"
+  ],
+  "author": "AASWE Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aaswe/codebase-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aaswe/codebase-ai/issues"
+  },
+  "homepage": "https://github.com/aaswe/codebase-ai#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "docker-compose.yml",
+    "Dockerfile",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@langchain/anthropic": "^0.3.0",
+    "@langchain/community": "^0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/openai": "^0.3.0",
+    "@types/uuid": "^10.0.0",
+    "chokidar": "^4.0.1",
+    "commander": "^12.1.0",
+    "dotenv": "^16.6.1",
+    "glob": "^11.0.0",
+    "langchain": "^0.3.0",
+    "neo4j-driver": "^5.27.0",
+    "rdflib": "^2.2.35",
+    "simple-git": "^3.25.0",
+    "uuid": "^10.0.0",
+    "winston": "^3.17.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
+    "eslint": "^9.17.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "eslintConfig": {
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "@typescript-eslint/recommended"
+    ],
+    "rules": {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ],
+      "@typescript-eslint/no-explicit-any": "warn"
+    }
+  }
 }
