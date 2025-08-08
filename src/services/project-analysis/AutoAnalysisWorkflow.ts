@@ -18,6 +18,7 @@ import { TypeScriptAnalyzer } from '../layer1/ast-analyzer/TypeScriptAnalyzer';
 import { PythonAnalyzer } from '../layer1/ast-analyzer/PythonAnalyzer';
 import { JavaAnalyzer } from '../layer1/ast-analyzer/JavaAnalyzer';
 import { AnalysisResult } from '../layer1/ast-analyzer/types';
+import { BusinessContextPreserver, PreservationResult } from './BusinessContextPreserver';
 
 export interface AutoAnalysisConfig {
   projectRoot: string;
@@ -54,7 +55,9 @@ export interface EnhancedAnalysisResult extends ProjectAnalysisResult {
   knowledgeGraphNodes: number;
   knowledgeGraphRelationships: number;
   mcpContextSize: number;
-  businessContextCompleteness: number;
+  businessContextPreserved?: boolean;
+  enhancementsPreserved?: number;
+  preservationResult?: PreservationResult;
 }
 
 /**
@@ -67,6 +70,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
   private config: AutoAnalysisConfig;
   private projectAnalysisService: ProjectAnalysisService;
   private rdfService: RDFService;
+  private businessContextPreserver: BusinessContextPreserver;
   private moduleKnowledgeManager: ModuleKnowledgeManager;
   private analyzers: Map<string, BaseAnalyzer>;
   private isInitialized = false;
@@ -122,6 +126,15 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       enableLLMPreview: this.config.enableMCPContextLoading
     });
 
+    // Initialize business context preserver
+    this.businessContextPreserver = new BusinessContextPreserver({
+      preservationEnabled: this.config.preserveBusinessContext,
+      backupEnabled: true,
+      backupDirectory: path.join(this.config.projectRoot, '.aaswe', 'backups', 'business-context'),
+      conflictResolution: 'merge',
+      maxBackupVersions: 10
+    });
+
     // Initialize analyzers
     this.analyzers = new Map();
     this.setupAnalyzers();
@@ -145,6 +158,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       // Initialize all services
       await this.projectAnalysisService.initialize();
       await this.moduleKnowledgeManager.initialize();
+      await this.businessContextPreserver.initialize();
 
       // Ensure output directory exists
       await fs.mkdir(path.resolve(this.config.projectRoot, this.config.outputDirectory), { 
@@ -198,9 +212,28 @@ export class AutoAnalysisWorkflow extends EventEmitter {
         mcpContextSize = await this.loadMCPContext(ttlResults);
       }
       
-      // Phase 6: Calculate business context completeness
-      logger.info('Phase 6: Calculating business context completeness');
-      const businessContextCompleteness = await this.calculateBusinessContextCompleteness(ttlResults);
+      // Phase 6: Preserve and restore business context
+      let preservationResult: PreservationResult | undefined;
+      if (this.config.preserveBusinessContext) {
+        logger.info('Phase 6: Preserving business context');
+        preservationResult = await this.businessContextPreserver.preserveBusinessContext(
+          Array.from(ttlResults.keys())
+        );
+        
+        // Restore business context to the newly generated TTL files
+        if (preservationResult.success) {
+          logger.info('Phase 6b: Restoring business context to TTL files');
+          const restorationResult = await this.businessContextPreserver.restoreContext(
+            Array.from(ttlResults.keys())
+          );
+          
+          // Update preservation result with restoration stats
+          if (restorationResult.success) {
+            preservationResult.statistics.enhancementsPreserved += restorationResult.statistics.enhancementsPreserved;
+            preservationResult.conflictsResolved += restorationResult.conflictsResolved;
+          }
+        }
+      }
 
       const endTime = Date.now();
       const totalDuration = endTime - startTime;
@@ -213,7 +246,9 @@ export class AutoAnalysisWorkflow extends EventEmitter {
         knowledgeGraphNodes: knowledgeGraphStats.nodes,
         knowledgeGraphRelationships: knowledgeGraphStats.relationships,
         mcpContextSize,
-        businessContextCompleteness,
+        businessContextPreserved: preservationResult?.success || false,
+        enhancementsPreserved: preservationResult?.preservedEnhancements || 0,
+        ...(preservationResult && { preservationResult }),
         summary: {
           ...standardResult.summary,
           ttlFilesGenerated: ttlResults.size
@@ -226,7 +261,8 @@ export class AutoAnalysisWorkflow extends EventEmitter {
         ttlFilesGenerated: enhancedResult.summary.ttlFilesGenerated,
         knowledgeGraphNodes: knowledgeGraphStats.nodes,
         mcpContextSize,
-        businessContextCompleteness: Math.round(businessContextCompleteness * 100)
+        businessContextPreserved: preservationResult?.success || false,
+        enhancementsPreserved: preservationResult?.preservedEnhancements || 0
       });
 
       this.emit('analysis_completed', enhancedResult);
@@ -273,13 +309,36 @@ export class AutoAnalysisWorkflow extends EventEmitter {
         mcpContextSize = await this.updateMCPContext(ttlResults);
       }
 
+      // Phase 6: Preserve and restore business context for incremental analysis
+      let preservationResult: PreservationResult | undefined;
+      if (this.config.preserveBusinessContext) {
+        preservationResult = await this.businessContextPreserver.preserveBusinessContext(
+          Array.from(ttlResults.keys())
+        );
+        
+        // Restore business context to the updated TTL files
+        if (preservationResult && preservationResult.success) {
+          const restorationResult = await this.businessContextPreserver.restoreContext(
+            Array.from(ttlResults.keys())
+          );
+          
+          // Update preservation result with restoration stats
+          if (restorationResult.success) {
+            preservationResult.statistics.enhancementsPreserved += restorationResult.statistics.enhancementsPreserved;
+            preservationResult.conflictsResolved += restorationResult.conflictsResolved;
+          }
+        }
+      }
+
       const enhancedResult: EnhancedAnalysisResult = {
         ...standardResult,
         concreteInformation,
         knowledgeGraphNodes: knowledgeGraphStats.nodes,
         knowledgeGraphRelationships: knowledgeGraphStats.relationships,
         mcpContextSize,
-        businessContextCompleteness: 0 // Not calculated for incremental
+        businessContextPreserved: preservationResult?.success || false,
+        enhancementsPreserved: preservationResult?.preservedEnhancements || 0,
+        ...(preservationResult && { preservationResult })
       };
 
       logger.info('Incremental analysis completed', {
@@ -628,24 +687,6 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     return totalSize;
   }
 
-  private async calculateBusinessContextCompleteness(ttlResults: Map<string, any>): Promise<number> {
-    // Calculate how much business context is present vs placeholders
-    let totalPlaceholders = 0;
-    let filledPlaceholders = 0;
-    
-    for (const result of ttlResults.values()) {
-      if (result.rdfContent) {
-        const placeholderMatches = result.rdfContent.match(/\[BUSINESS_\w+\]/g) || [];
-        totalPlaceholders += placeholderMatches.length;
-        
-        // Count non-placeholder business context
-        const businessMatches = result.rdfContent.match(/business:\w+/g) || [];
-        filledPlaceholders += businessMatches.length;
-      }
-    }
-    
-    return totalPlaceholders > 0 ? filledPlaceholders / totalPlaceholders : 0;
-  }
 
   private async updateTTLFiles(changedFiles: string[], concreteInfo: Map<string, ConcreteInformation>): Promise<Map<string, any>> {
     const ttlResults = new Map();
