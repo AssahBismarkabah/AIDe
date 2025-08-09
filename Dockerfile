@@ -14,20 +14,16 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
 
-# Install dependencies without running prepare script
-RUN npm install --legacy-peer-deps --ignore-scripts
+# Install only production dependencies
+RUN npm install --only=production --legacy-peer-deps
 
-# Copy source code
-COPY src/ ./src/
-COPY . .
-
-# Build the application explicitly
-RUN npx tsc --project tsconfig.json
-
-# Remove dev dependencies to reduce image size
-RUN npm prune --omit=dev
+# Copy pre-built application files
+COPY dist/ ./dist/
+COPY docker-compose.yml ./
+COPY .env.example ./
+COPY docs/ ./docs/
+COPY scripts/ ./scripts/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
