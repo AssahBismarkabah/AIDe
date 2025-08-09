@@ -206,7 +206,7 @@ program
       
       // Get the directory where this CLI script is installed
       const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
-      const packageRoot = path.dirname(path.dirname(cliScriptPath)); // Go up from dist/cli to package root
+      const packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath))); // Go up from dist/cli to package root
       const dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
       
       // Verify docker-compose.yml exists in package
