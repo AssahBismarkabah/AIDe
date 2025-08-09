@@ -192,15 +192,35 @@ program
 program
   .command('full-start')
   .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis)')
-  .option('--project-path <path>', 'Custom project path', process.cwd())
+  .option('--project-path <path>', 'Custom project path for analysis (not docker-compose location)', process.cwd())
   .option('--detach', 'Run containers in background')
   .option('--build', 'Rebuild containers before starting')
   .action(async (options) => {
     try {
-      const projectPath = options.projectPath || process.cwd();
+      // The project path is for analysis, but docker-compose should run from AASWE package directory
+      const analysisProjectPath = options.projectPath || process.cwd();
+      
+      // Find the AASWE package directory (where docker-compose.yml is located)
+      const path = require('path');
+      const fs = require('fs');
+      
+      // Get the directory where this CLI script is installed
+      const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
+      const packageRoot = path.dirname(path.dirname(cliScriptPath)); // Go up from dist/cli to package root
+      const dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+      
+      // Verify docker-compose.yml exists in package
+      if (!fs.existsSync(dockerComposePath)) {
+        logger.error('❌ AASWE docker-compose.yml not found in package');
+        logger.error(`Expected at: ${dockerComposePath}`);
+        logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
+        process.exit(1);
+      }
       
       logger.info('🚀 Starting Complete AASWE System with All Containers...');
       logger.info('📦 This includes: Neo4j Database + MCP Server + Redis Cache');
+      logger.info(`🎯 Analysis will target: ${analysisProjectPath}`);
+      logger.info(`🐳 Using docker-compose from: ${packageRoot}`);
       
       // Check if Docker is available
       const { spawn } = require('child_process');
@@ -228,7 +248,8 @@ program
         if (options.detach) args.push('-d');
         if (options.build) args.push('--build');
         
-        // Start core services (no web profile needed)
+        // Set environment variable for the analysis project path
+        const env = { ...process.env, ANALYSIS_PROJECT_PATH: analysisProjectPath };
         
         logger.info('🐳 Starting all AASWE containers...');
         logger.info('📊 Services starting:');
@@ -238,7 +259,8 @@ program
         
         const child = spawn('docker', args, {
           stdio: 'inherit',
-          cwd: projectPath
+          cwd: packageRoot, // Use AASWE package root, not current directory
+          env: env
         });
         
         child.on('close', (code) => {
