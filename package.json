@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
+    "codebase-ai": "dist/cli/index.js",
     "aaswe": "dist/cli/index.js"
   },
   "scripts": {
@@ -63,9 +64,12 @@
     "LICENSE",
     "INSTALLATION.md",
     ".env.example",
-    "scripts/quick-start.sh"
+    "scripts/quick-start.sh",
+    "scripts/one-command-deploy.sh",
+    "docs/**/*"
   ],
   "dependencies": {
+    "@codegraph-js/codegraph": "^0.0.2",
     "@langchain/anthropic": "^0.3.0",
     "@langchain/community": "^0.3.0",
     "@langchain/core": "^0.3.0",

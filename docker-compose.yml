@@ -74,23 +74,8 @@ services:
       timeout: 10s
       retries: 3
 
-  # AASWE Web Interface (optional)
-  aaswe-web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_AASWE_API_URL=http://localhost:3001
-      - REACT_APP_NEO4J_BROWSER_URL=http://localhost:7474
-    depends_on:
-      - aaswe-server
-    restart: unless-stopped
-    networks:
-      - aaswe-network
-    profiles:
-      - web
+  # Note: Web interface not implemented yet
+  # Neo4j Browser available at http://localhost:7474 for graph visualization
 
 volumes:
   neo4j-data:

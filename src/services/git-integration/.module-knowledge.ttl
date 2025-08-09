@@ -1,5 +1,5 @@
 # Enhanced TTL Metadata:
-# Generated: 2025-08-08T17:29:28.040Z
+# Generated: 2025-08-08T22:22:44.068Z
 # Source: /Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/services/git-integration/GitHooksManager.ts
 # Language: typescript
 # Classes: 0
@@ -30,7 +30,7 @@
 # - Business domain indicators based on naming analysis
 # - Quality metrics including complexity and maintainability scores
 #
-# Generated at: 2025-08-08T17:29:28.039Z
+# Generated at: 2025-08-08T22:22:44.068Z
 #
 
 @prefix code: <https://aaswe.ai/ontology/code#>.
@@ -47,7 +47,7 @@
     code:language "typescript";
     code:version "1.0.0";
     code:filePath "/Users/adorsys123/Desktop/dev2.2/Desktop/Desktop - MacBook Pro (2)/dev/ai/aaswe-eng/src/services/git-integration/GitHooksManager.ts";
-    code:timestamp "2025-08-08T17:29:28.038Z";
+    code:timestamp "2025-08-08T22:22:44.067Z";
     code:classCount 0;
     code:functionCount 0;
     code:dependencyCount 6;

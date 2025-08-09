@@ -470,29 +470,99 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       return concreteInfo;
     }
 
-    logger.debug('Extracting concrete information from analysis results');
+    logger.debug('Extracting concrete information using MultiLanguageCodeGraphAnalyzer');
 
-    for (const fileResult of analysisResult.files) {
-      if (fileResult.status !== 'success') {
-        continue;
+    try {
+      // Use MultiLanguageCodeGraphAnalyzer for reliable multi-language analysis
+      const { MultiLanguageCodeGraphAnalyzer } = await import('./MultiLanguageCodeGraphAnalyzer');
+      const { Neo4jDatabaseService } = await import('../layer2/neo4j-database/Neo4jDatabaseService');
+      
+      // Create and connect Neo4j service
+      const neo4jService = new Neo4jDatabaseService();
+      
+      // Try to connect to Neo4j if credentials are available
+      const neo4jUri = process.env.NEO4J_URI || 'bolt://localhost:7687';
+      const neo4jUsername = process.env.NEO4J_USERNAME || 'neo4j';
+      const neo4jPassword = process.env.NEO4J_PASSWORD || 'aaswe-password';
+      
+      const config = {
+        uri: neo4jUri,
+        username: neo4jUsername,
+        password: neo4jPassword,
+        database: 'neo4j',
+        encrypted: false
+      };
+      
+      await neo4jService.connect(config);
+      const analyzer = new MultiLanguageCodeGraphAnalyzer(neo4jService);
+      
+      // Analyze the project using the enhanced analyzer
+      const analysisResult = await analyzer.analyzeMultiLanguageCodebase(this.config.projectRoot);
+      
+      // Disconnect after analysis
+      await neo4jService.disconnect();
+      
+      // Convert MultiLanguageCodeGraphAnalyzer results to ConcreteInformation format
+      for (const entity of analysisResult.entities) {
+        if (entity.type === 'File') {
+          const filePath = entity.filePath;
+          
+          // Get all entities for this file
+          const fileEntities = analysisResult.entities.filter(e => e.filePath === filePath);
+          const classes = fileEntities.filter(e => e.type === 'Class');
+          const methods = fileEntities.filter(e => e.type === 'Method' || e.type === 'Function');
+          
+          const concrete: ConcreteInformation = {
+            actualClassNames: classes.map(c => c.name),
+            actualMethodSignatures: methods.map(m => `${m.name}()`), // Simplified signature
+            actualDependencies: [], // Would need relationship analysis
+            actualExports: classes.filter(c => c.metadata?.visibility === 'public').map(c => c.name),
+            actualImports: [], // Would need import analysis
+            architecturalPatterns: this.detectArchitecturalPatternsFromNames([...classes.map(c => c.name), ...methods.map(m => m.name)]),
+            businessDomainIndicators: this.detectBusinessDomainFromNames([...classes.map(c => c.name), ...methods.map(m => m.name)]),
+            qualityMetrics: {
+              complexity: entity.metadata?.complexity || 1,
+              maintainability: 80, // Default value
+              testCoverage: 0,
+              documentation: 0
+            }
+          };
+          
+          concreteInfo.set(filePath, concrete);
+        }
       }
+      
+      logger.info('✅ Concrete information extracted using MultiLanguageCodeGraphAnalyzer', {
+        filesProcessed: concreteInfo.size,
+        totalEntities: analysisResult.entities.length,
+        languages: analysisResult.languages.join(', ')
+      });
 
-      try {
-        // Re-analyze file for detailed concrete information
-        const analyzer = this.analyzers.get(fileResult.language);
-        if (!analyzer) {
+    } catch (error) {
+      logger.warn('⚠️ MultiLanguageCodeGraphAnalyzer failed, falling back to old analyzers', { error });
+      
+      // Fallback to old analyzer approach
+      for (const fileResult of analysisResult.files) {
+        if (fileResult.status !== 'success') {
           continue;
         }
 
-        const detailedAnalysis = await analyzer.analyzeFile(fileResult.filePath);
-        const concrete = await this.buildConcreteInformation(detailedAnalysis);
-        concreteInfo.set(fileResult.filePath, concrete);
+        try {
+          const analyzer = this.analyzers.get(fileResult.language);
+          if (!analyzer) {
+            continue;
+          }
 
-      } catch (error) {
-        logger.warn('Failed to extract concrete information', {
-          filePath: fileResult.filePath,
-          error
-        });
+          const detailedAnalysis = await analyzer.analyzeFile(fileResult.filePath);
+          const concrete = await this.buildConcreteInformation(detailedAnalysis);
+          concreteInfo.set(fileResult.filePath, concrete);
+
+        } catch (error) {
+          logger.warn('Failed to extract concrete information', {
+            filePath: fileResult.filePath,
+            error
+          });
+        }
       }
     }
 
@@ -753,28 +823,70 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       return { nodes: totalNodes, relationships: totalRelationships };
     }
     
-    // Neo4j is available, proceed with population
-    for (const [ttlPath, result] of ttlResults) {
-      try {
-        // Parse TTL content and extract entities
-        const content = result.rdfContent;
-        const classMatches = content.match(/aide:Class/g) || [];
-        const methodMatches = content.match(/aide:Method/g) || [];
-        const functionMatches = content.match(/aide:Function/g) || [];
-        const dependencyMatches = content.match(/aide:dependsOn/g) || [];
-        const extendsMatches = content.match(/aide:extends/g) || [];
-        
-        const nodes = classMatches.length + methodMatches.length + functionMatches.length;
-        const relationships = dependencyMatches.length + extendsMatches.length;
-        
-        totalNodes += nodes;
-        totalRelationships += relationships;
-        
-        // Create Neo4j nodes and relationships
-        await this.createKnowledgeGraphEntities(ttlPath, content, nodes, relationships);
-        
-      } catch (error) {
-        logger.error('Failed to populate knowledge graph for TTL', { ttlPath, error });
+    // Neo4j is available, use MultiLanguageCodeGraphAnalyzer for actual source code analysis
+    try {
+      logger.info('🔍 Using MultiLanguageCodeGraphAnalyzer for comprehensive source code analysis');
+      
+      const { Neo4jDatabaseService } = await import('../layer2/neo4j-database/Neo4jDatabaseService');
+      const { MultiLanguageCodeGraphAnalyzer } = await import('./MultiLanguageCodeGraphAnalyzer');
+      
+      const neo4jService = new Neo4jDatabaseService();
+      
+      const config = {
+        uri: process.env.NEO4J_URI!,
+        username: process.env.NEO4J_USERNAME!,
+        password: process.env.NEO4J_PASSWORD!,
+        database: 'neo4j',
+        encrypted: false
+      };
+      
+      await neo4jService.connect(config);
+      const analyzer = new MultiLanguageCodeGraphAnalyzer(neo4jService);
+      
+      // Analyze the entire project with multi-language support
+      logger.info('🚀 Starting multi-language codebase analysis...');
+      const analysisResult = await analyzer.analyzeMultiLanguageCodebase(this.config.projectRoot);
+      
+      totalNodes = analysisResult.entities.length;
+      totalRelationships = analysisResult.relationships.length;
+      
+      logger.info('✅ Multi-language analysis completed successfully', {
+        languages: analysisResult.languages.join(', '),
+        totalFiles: analysisResult.statistics.totalFiles,
+        totalClasses: analysisResult.statistics.totalClasses,
+        totalMethods: analysisResult.statistics.totalMethods,
+        totalLines: analysisResult.statistics.totalLines,
+        totalNodes,
+        totalRelationships
+      });
+      
+      await neo4jService.disconnect();
+      
+    } catch (error) {
+      logger.error('❌ Multi-language analysis failed, falling back to TTL-based population', { error });
+      
+      // Fallback to TTL-based population
+      for (const [ttlPath, result] of ttlResults) {
+        try {
+          const content = result.rdfContent;
+          const classMatches = content.match(/aide:Class/g) || [];
+          const methodMatches = content.match(/aide:Method/g) || [];
+          const functionMatches = content.match(/aide:Function/g) || [];
+          const dependencyMatches = content.match(/aide:dependsOn/g) || [];
+          const extendsMatches = content.match(/aide:extends/g) || [];
+          
+          const nodes = classMatches.length + methodMatches.length + functionMatches.length;
+          const relationships = dependencyMatches.length + extendsMatches.length;
+          
+          totalNodes += nodes;
+          totalRelationships += relationships;
+          
+          // Create Neo4j nodes and relationships
+          await this.createKnowledgeGraphEntities(ttlPath, content, nodes, relationships);
+          
+        } catch (error) {
+          logger.error('Failed to populate knowledge graph for TTL', { ttlPath, error });
+        }
       }
     }
     
@@ -1106,5 +1218,72 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       '.hpp': 'cpp'
     };
     return languageMap[ext] || 'typescript';
+  }
+
+  /**
+   * Detect architectural patterns from class and method names
+   */
+  private detectArchitecturalPatternsFromNames(names: string[]): string[] {
+    const patterns: string[] = [];
+    const lowerNames = names.map(name => name.toLowerCase());
+    
+    if (lowerNames.some(name => name.includes('factory'))) {
+      patterns.push('Factory Pattern');
+    }
+    if (lowerNames.some(name => name.includes('singleton'))) {
+      patterns.push('Singleton Pattern');
+    }
+    if (lowerNames.some(name => name.includes('observer'))) {
+      patterns.push('Observer Pattern');
+    }
+    if (lowerNames.some(name => name.includes('builder'))) {
+      patterns.push('Builder Pattern');
+    }
+    if (lowerNames.some(name => name.includes('middleware'))) {
+      patterns.push('Middleware Pattern');
+    }
+    if (lowerNames.some(name => name.includes('command'))) {
+      patterns.push('Command Pattern');
+    }
+    if (lowerNames.some(name => name.includes('strategy'))) {
+      patterns.push('Strategy Pattern');
+    }
+    if (lowerNames.some(name => name.includes('adapter'))) {
+      patterns.push('Adapter Pattern');
+    }
+    
+    return patterns;
+  }
+
+  /**
+   * Detect business domain indicators from class and method names
+   */
+  private detectBusinessDomainFromNames(names: string[]): string[] {
+    const indicators: string[] = [];
+    const lowerNames = names.map(name => name.toLowerCase());
+    
+    const domainKeywords = {
+      'E-commerce': ['order', 'cart', 'payment', 'product', 'customer', 'checkout'],
+      'Finance': ['account', 'transaction', 'balance', 'payment', 'invoice', 'billing'],
+      'Healthcare': ['patient', 'medical', 'diagnosis', 'treatment', 'doctor', 'appointment'],
+      'Education': ['student', 'course', 'grade', 'assignment', 'teacher', 'class'],
+      'HR': ['employee', 'payroll', 'attendance', 'performance', 'recruitment'],
+      'CRM': ['lead', 'contact', 'opportunity', 'pipeline', 'sales'],
+      'Content Management': ['article', 'post', 'content', 'publish', 'editor'],
+      'Authentication': ['user', 'login', 'auth', 'token', 'session', 'permission'],
+      'Configuration Management': ['config', 'properties', 'settings', 'environment']
+    };
+    
+    for (const [domain, keywords] of Object.entries(domainKeywords)) {
+      const matches = keywords.filter(keyword =>
+        lowerNames.some(name => name.includes(keyword))
+      );
+      
+      if (matches.length >= 1) {
+        indicators.push(domain);
+      }
+    }
+    
+    return indicators;
   }
 }

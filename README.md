@@ -1,4 +1,4 @@
-# AASWE - AI-Assisted Software Engineering
+# AASWE - AI-Assisted Engineering
 
 [![npm version](https://badge.fury.io/js/@aaswe/codebase-ai.svg)](https://badge.fury.io/js/@aaswe/codebase-ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,23 +10,37 @@ AASWE transforms your codebase into structured knowledge that enhances your IDE'
 
 ## 🚀 Quick Start
 
-### Option 1: One-Command Setup (Recommended)
-```bash
-# Install and setup in one command
-curl -fsSL https://raw.githubusercontent.com/aaswe/codebase-ai/main/scripts/quick-start.sh | bash
-```
+> **📦 Package Status**: Ready for NPM publication! Currently available as tarball for testing.
 
-### Option 2: Manual Installation
+### Option 1: One-Command Complete Setup ⭐ (Recommended)
 ```bash
-# Install globally
+# Install, setup, and start complete system with all containers
+curl -fsSL https://raw.githubusercontent.com/aaswe/codebase-ai/main/scripts/one-command-deploy.sh | bash
+```
+**This gives you everything**: Neo4j database + MCP server + Redis cache
+
+### Option 2: NPM Installation (Coming Soon)
+```bash
+# Will be available after NPM publication
 npm install -g @aaswe/codebase-ai
 
-# Initialize in your project
-cd your-project
-aaswe init
+# For lightweight mode (TTL files only)
+codebase-ai start
 
-# Start the system
-aaswe start
+# For complete system (all containers)
+codebase-ai full-start
+```
+
+### Option 3: Direct Installation (Current)
+```bash
+# Download and install from tarball
+curl -L -o codebase-ai.tgz https://github.com/aaswe/codebase-ai/releases/latest/download/aaswe-codebase-ai-1.0.0.tgz
+npm install -g ./codebase-ai.tgz
+
+# Initialize and start complete system
+cd your-project
+codebase-ai init --mode full
+codebase-ai full-start
 ```
 
 ### Option 3: Docker Compose (Full System)
@@ -39,29 +53,34 @@ docker-compose up -d
 
 ## ✨ Features
 
-### 🧠 **Intelligent Code Analysis**
-- **Multi-language support**: TypeScript, JavaScript, Python, Java, Go, Rust, C++
-- **Concrete information extraction**: Real class names, method signatures, dependencies
-- **Architectural pattern detection**: Factory, Singleton, Observer, Builder patterns
-- **Business domain analysis**: E-commerce, Finance, Healthcare domain detection
+### 🧠 **Triple Context System**
+- **TTL Metadata**: Structured semantic knowledge in RDF/TTL format
+- **Neo4j Source Code**: Complete source code + relationships in graph database
+- **MCP Integration**: Universal IDE compatibility with unified context delivery
 
-### 📊 **Knowledge Graph Generation**
-- **RDF/TTL files**: Structured knowledge in industry-standard formats
-- **Neo4j integration**: Graph database for complex relationship queries
-- **Business context preservation**: Maintains developer annotations during re-analysis
-- **Incremental updates**: Efficient analysis of changed files only
+### 🔍 **Multi-Language Code Analysis**
+- **12 Languages**: TypeScript, JavaScript, Python, Java, Go, Rust, C++, C#, PHP, Ruby, Kotlin, Scala, Swift
+- **Complete Source Storage**: Full source code stored in Neo4j for LLM queries
+- **Concrete Information**: Real class names, method signatures, dependencies
+- **Architectural Patterns**: Factory, Singleton, Observer, Builder pattern detection
 
-### 🔗 **IDE Integration**
-- **Model Context Protocol (MCP)**: Universal IDE integration standard
-- **VS Code support**: Works with Continue extension
-- **Cursor support**: Native MCP integration
-- **Any MCP-compatible IDE**: Universal compatibility
+### 🔄 **Automatic Synchronization**
+- **Git Integration**: Auto-updates on commits and merges
+- **TTL File Changes**: Automatic Neo4j knowledge graph updates
+- **Source Code Changes**: Automatic TTL regeneration + graph updates
+- **Business Context Preservation**: Maintains developer annotations during re-analysis
 
-### 🐳 **Easy Deployment**
-- **Context-only mode**: No infrastructure required
-- **Full system mode**: Complete with Neo4j and web interface
-- **Docker Compose**: One-command deployment
-- **Health monitoring**: Built-in health checks and metrics
+### 🔗 **Universal IDE Integration**
+- **Model Context Protocol (MCP)**: Works with any MCP-compatible IDE
+- **VS Code + Continue**: Native integration
+- **Cursor**: Built-in MCP support
+- **Real-time Context**: Always-current codebase knowledge
+
+### 🐳 **One-Command Deployment**
+- **Complete System**: Neo4j + MCP Server + Redis with single command
+- **Lightweight Mode**: TTL-only mode for individual developers
+- **Docker Compose**: Full containerized deployment
+- **Neo4j Browser**: Built-in graph visualization and exploration
 
 ## 📋 System Requirements
 
@@ -89,10 +108,10 @@ npm install -g @aaswe/codebase-ai
 cd your-project
 
 # Initialize AASWE
-aaswe init
+codebase-ai init
 
 # For full system mode
-aaswe init --mode full
+codebase-ai init --mode full
 ```
 
 ### Configuration
@@ -108,46 +127,46 @@ AASWE creates these files:
 #### Start the System
 ```bash
 # Context-only mode (recommended)
-aaswe start
+codebase-ai start
 
 # Full system mode
-aaswe start --mode full --port 8000
+codebase-ai start --mode full --port 8000
 
 # With debug logging
-aaswe start --debug
+codebase-ai start --debug
 ```
 
 #### Analyze Your Project
 ```bash
 # Basic analysis
-aaswe analyze
+codebase-ai analyze
 
 # Custom output directory
-aaswe analyze --output ./knowledge
+codebase-ai analyze --output ./knowledge
 
 # Specific languages
-aaswe analyze --languages typescript,python
+codebase-ai analyze --languages typescript,python
 ```
 
 #### Check Status
 ```bash
 # Check if server is running
-aaswe status
+codebase-ai status
 
 # Check specific port
-aaswe status --port 3001
+codebase-ai status --port 3001
 ```
 
 #### Docker Commands
 ```bash
 # Start with Docker
-aaswe docker up -d
+codebase-ai docker up -d
 
 # View logs
-aaswe docker logs -f
+codebase-ai docker logs -f
 
 # Stop services
-aaswe docker down
+codebase-ai docker down
 ```
 
 ### IDE Configuration
@@ -159,8 +178,8 @@ aaswe docker down
 {
   "mcpServers": {
     "aaswe": {
-      "command": "node",
-      "args": ["/path/to/aaswe/dist/cli/index.js", "start", "--port", "3001"],
+      "command": "codebase-ai",
+      "args": ["start", "--port", "3001"],
       "env": {}
     }
   }
@@ -171,8 +190,8 @@ aaswe docker down
 1. Go to **Settings → Features → Model Context Protocol**
 2. Add server:
    - **Name**: AASWE
-   - **Command**: `node`
-   - **Args**: `["/path/to/aaswe/dist/cli/index.js", "start", "--port", "3001"]`
+   - **Command**: `codebase-ai`
+   - **Args**: `["start", "--port", "3001"]`
 
 #### Other IDEs
 Connect to the MCP server at `ws://localhost:3001`
@@ -279,10 +298,10 @@ curl http://localhost:3001/health
 ### System Status
 ```bash
 # Check all services
-aaswe status
+codebase-ai status
 
 # Docker services
-aaswe docker logs aaswe-server
+codebase-ai docker logs aaswe-server
 ```
 
 ### Metrics (Full Mode)
@@ -316,7 +335,7 @@ lsof -ti:3001 | xargs kill -9
 #### "TTL files not found"
 ```bash
 # Re-analyze project
-aaswe analyze --output ./knowledge
+codebase-ai analyze --output ./knowledge
 
 # Check permissions
 ls -la ./knowledge/
@@ -336,20 +355,20 @@ docker-compose restart neo4j
 #### Large Projects
 ```bash
 # Exclude unnecessary files
-aaswe analyze --exclude "**/node_modules/**,**/dist/**"
+codebase-ai analyze --exclude "**/node_modules/**,**/dist/**"
 
 # Use incremental analysis
-aaswe analyze --incremental
+codebase-ai analyze --incremental
 
 # Limit analysis depth
-aaswe analyze --depth basic
+codebase-ai analyze --depth basic
 ```
 
 #### Memory Issues
 ```bash
 # Increase Node.js memory
 export NODE_OPTIONS="--max-old-space-size=4096"
-aaswe start
+codebase-ai start
 ```
 
 ## 🏗 Architecture

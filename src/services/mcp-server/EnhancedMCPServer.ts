@@ -9,11 +9,13 @@ import { EventEmitter } from 'events';
 import logger from '../../utils/logger';
 import { MCPServer } from './MCPServer';
 import { TTLContextLoader } from './TTLContextLoader';
+import { Neo4jContextProvider } from './Neo4jContextProvider';
 import { KnowledgeGraphPopulator } from '../project-analysis/KnowledgeGraphPopulator';
 import { EnhancedRDFGenerator } from '../layer1/rdf-generator/EnhancedRDFGenerator';
 import { ConcreteInformationExtractor } from '../layer1/rdf-generator/ConcreteInformationExtractor';
 import { Layer3AIService } from '../layer3/index';
 import { HybridStorageManager } from '../layer2/hybrid-storage/HybridStorageManager';
+import { Neo4jDatabaseService } from '../layer2/neo4j-database/Neo4jDatabaseService';
 import {
   ContextRequest,
   ContextResponse,
@@ -28,6 +30,7 @@ import {
 export class EnhancedMCPServer extends EventEmitter {
   private mcpServer: MCPServer;
   private ttlContextLoader: TTLContextLoader;
+  private neo4jContextProvider: Neo4jContextProvider | null = null;
   private _knowledgeGraphPopulator: KnowledgeGraphPopulator;
   private _rdfGenerator: EnhancedRDFGenerator;
   private _informationExtractor: ConcreteInformationExtractor;
@@ -42,7 +45,8 @@ export class EnhancedMCPServer extends EventEmitter {
     hybridStorage: HybridStorageManager,
     knowledgeGraphPopulator: KnowledgeGraphPopulator,
     rdfGenerator: EnhancedRDFGenerator,
-    informationExtractor: ConcreteInformationExtractor
+    informationExtractor: ConcreteInformationExtractor,
+    neo4jService?: Neo4jDatabaseService
   ) {
     super();
     
@@ -66,12 +70,24 @@ export class EnhancedMCPServer extends EventEmitter {
       this._informationExtractor
     );
     
+    // Initialize Neo4j context provider if Neo4j service is available
+    if (neo4jService && neo4jService.isConnected()) {
+      this.neo4jContextProvider = new Neo4jContextProvider(neo4jService, {
+        maxResults: 10,
+        includeSourceCode: true,
+        relevanceThreshold: 0.3,
+        queryTimeout: 30000
+      });
+      logger.info('Neo4j context provider initialized');
+    }
+    
     this.metrics = this.initializeMetrics();
     this.setupEventHandlers();
     
     logger.info('EnhancedMCPServer initialized', {
       mcpServerPort: config.mcpServer.server.port,
-      ttlWatchEnabled: config.ttlContextLoader.watchEnabled
+      ttlWatchEnabled: config.ttlContextLoader.watchEnabled,
+      neo4jEnabled: !!this.neo4jContextProvider
     });
   }
 
@@ -177,19 +193,67 @@ export class EnhancedMCPServer extends EventEmitter {
   }
 
   /**
-   * Get enhanced context using TTL loader
+   * Get enhanced context using both TTL loader and Neo4j source code
    */
   async getEnhancedContext(request: ContextRequest): Promise<ContextResponse> {
     const startTime = Date.now();
     this.metrics.server.enhancedContextRequests++;
     
     try {
-      // Use TTL context loader for enhanced context
-      const response = await this.ttlContextLoader.loadContext(request);
+      // Get TTL context
+      const ttlResponse = await this.ttlContextLoader.loadContext(request);
+      
+      // Get Neo4j source code context if available
+      let neo4jSources: any[] = [];
+      if (this.neo4jContextProvider) {
+        try {
+          const neo4jResult = await this.neo4jContextProvider.getSourceCodeContext(request);
+          neo4jSources = neo4jResult.sources;
+          logger.debug('Neo4j context retrieved', {
+            sources: neo4jSources.length,
+            languages: neo4jResult.metadata.languages
+          });
+        } catch (neo4jError) {
+          logger.warn('Neo4j context retrieval failed, using TTL only', { error: neo4jError });
+        }
+      }
+      
+      // Combine TTL and Neo4j sources
+      const combinedSources = [...ttlResponse.sources, ...neo4jSources];
+      
+      // Generate enhanced context with both TTL metadata and source code
+      const enhancedContext = this.buildTripleContext(ttlResponse.context, neo4jSources, request);
+      
+      // Calculate combined metrics
+      const totalTokens = this.estimateTokens(enhancedContext);
+      const avgRelevance = combinedSources.length > 0
+        ? combinedSources.reduce((sum, s) => sum + s.relevanceScore, 0) / combinedSources.length
+        : 0;
+      
+      const response: ContextResponse = {
+        context: enhancedContext,
+        sources: combinedSources,
+        metadata: {
+          totalTokens,
+          processingTime: Date.now() - startTime,
+          relevanceScore: avgRelevance,
+          cached: false
+        },
+        suggestions: {
+          relatedFiles: ttlResponse.suggestions?.relatedFiles || [],
+          followUpQueries: [
+            ...ttlResponse.suggestions?.followUpQueries || [],
+            ...(neo4jSources.length > 0 ? ['What are the implementation details of this code?'] : [])
+          ],
+          improvements: [
+            ...ttlResponse.suggestions?.improvements || [],
+            ...(neo4jSources.length > 0 ? ['Source code analysis shows concrete implementation patterns'] : [])
+          ]
+        }
+      };
       
       // Update metrics
-      const processingTime = Date.now() - startTime;
-      this.updateMetrics(processingTime, response);
+      this.updateMetrics(response.metadata.processingTime, response);
       
       return response;
       
@@ -419,5 +483,77 @@ export class EnhancedMCPServer extends EventEmitter {
         details: { error: error instanceof Error ? error.message : String(error) }
       };
     }
+  }
+
+  /**
+   * Build triple context combining TTL metadata and Neo4j source code
+   */
+  private buildTripleContext(ttlContext: string, neo4jSources: any[], request: ContextRequest): string {
+    const lines = [
+      '# AASWE Triple Context System',
+      `# Current File: ${request.filePath}`,
+      `# Cursor Position: Line ${request.cursorPosition.line}, Column ${request.cursorPosition.column}`,
+      ''
+    ];
+    
+    if (request.query) {
+      lines.push(`# Query: ${request.query}`, '');
+    }
+    
+    if (request.intent) {
+      lines.push(`# Intent: ${request.intent}`, '');
+    }
+    
+    // Add TTL metadata context
+    lines.push(
+      '## 📋 Structured Knowledge (TTL Metadata)',
+      'This section provides architectural insights, business context, and module relationships:',
+      '',
+      ttlContext,
+      ''
+    );
+    
+    // Add Neo4j source code context
+    if (neo4jSources.length > 0) {
+      lines.push(
+        '## 💻 Source Code Analysis (Neo4j Graph)',
+        'This section provides actual implementation details and code structure:',
+        ''
+      );
+      
+      for (const source of neo4jSources.slice(0, 5)) { // Limit to top 5 most relevant
+        lines.push(
+          `### ${source.metadata.module} (${source.metadata.language?.toUpperCase()})`,
+          `Relevance: ${(source.relevanceScore * 100).toFixed(1)}% | ` +
+          `Classes: ${source.metadata.classes || 0} | ` +
+          `Methods: ${source.metadata.methods || 0} | ` +
+          `Complexity: ${source.metadata.complexity || 0}/10`,
+          '',
+          source.content,
+          ''
+        );
+      }
+    }
+    
+    // Add integration insights
+    lines.push(
+      '## 🔗 Integration Insights',
+      'The above context combines:',
+      '- **TTL Metadata**: Business logic, architectural patterns, and module relationships',
+      '- **Source Code**: Actual implementation, classes, methods, and code structure',
+      '- **Graph Relationships**: Dependencies, imports, and code connections',
+      '',
+      'This triple context provides both high-level understanding and implementation details.'
+    );
+    
+    return lines.join('\n');
+  }
+
+  /**
+   * Estimate tokens in text
+   */
+  private estimateTokens(text: string): number {
+    // Simple token estimation (roughly 4 characters per token)
+    return Math.ceil(text.length / 4);
   }
 }

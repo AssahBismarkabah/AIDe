@@ -123,7 +123,7 @@ export interface ContextResponse {
 }
 
 export interface ContextSource {
-  type: 'ttl' | 'graph' | 'code' | 'documentation';
+  type: 'ttl' | 'graph' | 'code' | 'documentation' | 'neo4j_source';
   path: string;
   content: string;
   relevanceScore: number;
@@ -132,6 +132,10 @@ export interface ContextSource {
     size: number;
     language?: string;
     module?: string;
+    classes?: number;
+    methods?: number;
+    relationships?: number;
+    complexity?: number;
   };
 }
 
@@ -508,4 +512,40 @@ export interface IntegrationMetrics {
     cacheHitRate: number;
     averageResponseTime: number;
   };
+}
+
+// Neo4j Context Provider Types
+export interface Neo4jContextProviderConfig {
+  maxResults: number;
+  includeSourceCode: boolean;
+  relevanceThreshold: number;
+  queryTimeout: number;
+}
+
+export interface Neo4jContextResult {
+  sources: ContextSource[];
+  metadata: {
+    totalFiles: number;
+    languages: string[];
+    processingTime: number;
+    queryCount: number;
+    error?: string;
+  };
+  statistics: {
+    classesFound: number;
+    methodsFound: number;
+    relationshipsFound: number;
+  };
+}
+
+export interface SourceCodeContext {
+  name: string;
+  path: string;
+  language: string;
+  sourceCode?: string;
+  classes: string[];
+  methods: string[];
+  complexity: number;
+  lastModified: Date;
+  relevanceScore?: number;
 }

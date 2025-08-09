@@ -16,13 +16,17 @@ import { MCPServer, createDefaultMCPConfig } from '../services/mcp-server';
 import { Layer3AIService } from '../services/layer3';
 import { HybridStorageManager } from '../services/layer2/hybrid-storage/HybridStorageManager';
 
-// Load environment variables
+// Load environment variables from .env.aaswe
+config({ path: '.env.aaswe' });
+
+// Also try loading from .env as fallback
 config();
 
 const program = new Command();
 
 program
-  .name('aaswe')
+  .name('codebase-ai')
+  .alias('aaswe')
   .description('AI-Assisted Software Engineering (AASWE) - Rich codebase context for IDE LLMs')
   .version('1.0.0');
 
@@ -183,6 +187,91 @@ program
   });
 
 /**
+ * Full-start command - Start complete system with all containers
+ */
+program
+  .command('full-start')
+  .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis)')
+  .option('--project-path <path>', 'Custom project path', process.cwd())
+  .option('--detach', 'Run containers in background')
+  .option('--build', 'Rebuild containers before starting')
+  .action(async (options) => {
+    try {
+      const projectPath = options.projectPath || process.cwd();
+      
+      logger.info('🚀 Starting Complete AASWE System with All Containers...');
+      logger.info('📦 This includes: Neo4j Database + MCP Server + Redis Cache');
+      
+      // Check if Docker is available
+      const { spawn } = require('child_process');
+      
+      // Check Docker availability
+      const dockerCheck = spawn('docker', ['--version'], { stdio: 'pipe' });
+      dockerCheck.on('error', () => {
+        logger.error('❌ Docker is not installed or not available');
+        logger.info('💡 Please install Docker Desktop: https://www.docker.com/products/docker-desktop');
+        process.exit(1);
+      });
+      
+      dockerCheck.on('close', async (code) => {
+        if (code !== 0) {
+          logger.error('❌ Docker is not running');
+          logger.info('💡 Please start Docker Desktop and try again');
+          process.exit(1);
+        }
+        
+        // Docker is available, proceed with startup
+        logger.info('✅ Docker detected - proceeding with container startup');
+        
+        // Build Docker Compose arguments
+        const args = ['compose', 'up'];
+        if (options.detach) args.push('-d');
+        if (options.build) args.push('--build');
+        
+        // Start core services (no web profile needed)
+        
+        logger.info('🐳 Starting all AASWE containers...');
+        logger.info('📊 Services starting:');
+        logger.info('   - Neo4j Database (Graph storage with source code)');
+        logger.info('   - Redis Cache (Performance optimization)');
+        logger.info('   - AASWE MCP Server (LLM integration)');
+        
+        const child = spawn('docker', args, {
+          stdio: 'inherit',
+          cwd: projectPath
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            logger.info('');
+            logger.info('🎉 Complete AASWE System Started Successfully!');
+            logger.info('');
+            logger.info('🔗 Access Points:');
+            logger.info('   📡 MCP Server: ws://localhost:3001 (for IDE integration)');
+            logger.info('   🗄️  Neo4j Browser: http://localhost:7474 (neo4j/aaswe-password)');
+            logger.info('   ⚡ Redis Cache: localhost:6379');
+            logger.info('');
+            logger.info('🎯 Next Steps:');
+            logger.info('   1. Configure your IDE to connect to: ws://localhost:3001');
+            logger.info('   2. Run: codebase-ai analyze (to populate the knowledge graph)');
+            logger.info('   3. Visit http://localhost:7474 to explore the Neo4j graph database');
+            logger.info('');
+            logger.info('💡 To stop all services: codebase-ai docker down');
+          } else {
+            logger.error('❌ Failed to start complete AASWE system');
+            logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
+            process.exit(code);
+          }
+        });
+      });
+      
+    } catch (error) {
+      logger.error('❌ Failed to start complete AASWE system', { error });
+      process.exit(1);
+    }
+  });
+
+/**
  * Init command - Initialize AASWE in current project
  */
 program
@@ -268,16 +357,17 @@ LOG_LEVEL=info
       logger.info('');
       logger.info('🚀 Next steps:');
       if (options.mode === 'context-only') {
-        logger.info('   1. Run: aaswe start --mode=context-only');
+        logger.info('   1. Run: codebase-ai start --mode=context-only');
         logger.info('   2. Configure your IDE to connect to: ws://localhost:3001');
         logger.info('   3. Your IDE LLM will now have rich codebase context!');
       } else {
         logger.info('   1. Set up API keys in .env.aaswe (if needed)');
-        logger.info('   2. Run: aaswe docker up');
+        logger.info('   2. Run: codebase-ai full-start');
         logger.info('   3. Access services:');
-        logger.info('      - MCP Server: ws://localhost:8000');
-        logger.info('      - Web Interface: http://localhost:3000');
+        logger.info('      - MCP Server: ws://localhost:3001');
         logger.info('      - Neo4j Browser: http://localhost:7474');
+        logger.info('');
+        logger.info('💡 Or use: codebase-ai docker up (for advanced users)');
       }
 
     } catch (error) {
@@ -307,7 +397,7 @@ program
         logger.warn('❌ AASWE Server is not running', {
           port: options.port
         });
-        logger.info('💡 Start with: aaswe start');
+        logger.info('💡 Start with: codebase-ai start (lightweight) or codebase-ai full-start (complete)');
       }
     } catch (error) {
       logger.error('❌ Failed to check server status', { error });
