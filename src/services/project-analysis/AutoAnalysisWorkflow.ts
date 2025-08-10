@@ -747,15 +747,18 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     const fullModuleDir = path.dirname(files[0]?.filePath || '');
     const moduleName = path.basename(fullModuleDir);
     
-    // Use the full absolute path for Neo4j query since that's how paths are stored
-    const moduleDir = fullModuleDir;
+    // Convert to relative path for Neo4j query since Neo4j stores relative paths
+    // Remove the project root to get the relative path that matches Neo4j storage
+    const relativePath = path.relative(this.config.projectRoot, fullModuleDir);
+    const moduleDir = relativePath.replace(/\\/g, '/'); // Normalize path separators for cross-platform compatibility
     
     logger.info('Creating module analysis with Neo4j data', {
       fullModuleDir,
       moduleDir,
       moduleName,
       filesCount: files.length,
-      projectRoot: this.config.projectRoot
+      projectRoot: this.config.projectRoot,
+      pathConversion: `${fullModuleDir} -> ${moduleDir}`
     });
 
     // Initialize combined analysis
@@ -1547,14 +1550,4 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     return indicators;
   }
 
-  /**
-   * Find common prefix between two paths for debugging
-   */
-  private findCommonPrefix(path1: string, path2: string): string {
-    let i = 0;
-    while (i < path1.length && i < path2.length && path1[i] === path2[i]) {
-      i++;
-    }
-    return path1.substring(0, i);
-  }
 }

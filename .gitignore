@@ -53,6 +53,7 @@ final-validation-git/
 final-test/
 neo4j-test/
 full-test/
+keycloak-config-cli
 
 # Dependency directories
 jspm_packages/
