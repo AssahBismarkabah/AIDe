@@ -15,8 +15,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm install --only=production --legacy-peer-deps
+# Install only production dependencies without running scripts
+RUN npm install --only=production --legacy-peer-deps --ignore-scripts
 
 # Copy pre-built application files
 COPY dist/ ./dist/
