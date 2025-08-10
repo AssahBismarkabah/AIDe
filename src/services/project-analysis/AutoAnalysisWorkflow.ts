@@ -743,10 +743,20 @@ export class AutoAnalysisWorkflow extends EventEmitter {
   }
 
   private async createModuleAnalysis(files: any[], concreteInfo: Map<string, ConcreteInformation>): Promise<AnalysisResult> {
-    // Combine analysis results from multiple files into a single module analysis
+    // Get the module directory path
+    const moduleDir = path.dirname(files[0]?.filePath || '');
+    const moduleName = path.basename(moduleDir);
+    
+    logger.info('Creating module analysis with Neo4j data', {
+      moduleDir,
+      moduleName,
+      filesCount: files.length
+    });
+
+    // Initialize combined analysis
     const combinedAnalysis: AnalysisResult = {
-      filePath: files[0]?.filePath || '',
-      language: files[0]?.language || 'unknown',
+      filePath: moduleDir,
+      language: files[0]?.language || 'java',
       nodes: [],
       functions: [],
       classes: [],
@@ -763,120 +773,205 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       errors: [],
       timestamp: new Date()
     };
-    
-    // Aggregate information from all files in the module
-    for (const file of files) {
-      const concrete = concreteInfo.get(file.filePath);
-      if (concrete) {
-        // Create synthetic classes and functions from concrete information
-        for (const className of concrete.actualClassNames) {
-          const classId = `class_${className}_${Math.random().toString(36).substr(2, 9)}`;
-          combinedAnalysis.classes.push({
-            id: classId,
-            name: className,
-            methods: concrete.actualMethodSignatures
-              .filter(sig => sig.startsWith(className + '.'))
-              .map(sig => ({
-                id: `method_${sig}_${Math.random().toString(36).substr(2, 9)}`,
-                name: sig.split('.')[1].split('(')[0],
-                parameters: [],
-                returnType: 'unknown',
-                complexity: 1,
-                startLine: 1,
-                endLine: 1,
-                filePath: file.filePath,
+
+    try {
+      // Query Neo4j directly for concrete information about all files in this module
+      const { Neo4jDatabaseService } = await import('../layer2/neo4j-database/Neo4jDatabaseService');
+      const neo4jService = new Neo4jDatabaseService();
+      
+      const config = {
+        uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
+        username: process.env.NEO4J_USERNAME || 'neo4j',
+        password: process.env.NEO4J_PASSWORD || 'aaswe-password',
+        database: 'neo4j',
+        encrypted: false
+      };
+      
+      await neo4jService.connect(config);
+      
+      // Query for all entities in this module directory
+      const moduleQuery = `
+        MATCH (f:File)-[:CONTAINS]->(entity)
+        WHERE f.filePath STARTS WITH $moduleDir
+        RETURN f.filePath as filePath, f.name as fileName,
+               collect({
+                 type: labels(entity)[0],
+                 name: entity.name,
+                 id: entity.id,
+                 startLine: entity.startLine,
+                 endLine: entity.endLine,
+                 complexity: entity.complexity,
+                 visibility: entity.visibility,
+                 isExported: entity.isExported,
+                 parameters: entity.parameters,
+                 returnType: entity.returnType
+               }) as entities
+      `;
+      
+      const session = neo4jService.getSession();
+      const result = await session.run(moduleQuery, { moduleDir });
+      
+      let totalClasses = 0;
+      let totalMethods = 0;
+      let totalComplexity = 0;
+      let totalLines = 0;
+      
+      // Process each file's entities
+      for (const record of result.records) {
+        const filePath = record.get('filePath');
+        const entities = record.get('entities');
+        
+        totalLines += 50; // Estimate lines per file
+        
+        for (const entity of entities) {
+          if (entity.type === 'Class') {
+            totalClasses++;
+            const classId = `class_${entity.name}_${entity.id}`;
+            
+            // Query for methods in this class
+            const methodQuery = `
+              MATCH (c:Class {id: $classId})-[:HAS_METHOD]->(m:Method)
+              RETURN m.name as name, m.id as id, m.parameters as parameters,
+                     m.returnType as returnType, m.complexity as complexity,
+                     m.startLine as startLine, m.endLine as endLine,
+                     m.visibility as visibility, m.isExported as isExported
+            `;
+            
+            const methodResult = await session.run(methodQuery, { classId: entity.id });
+            const methods = methodResult.records.map(methodRecord => {
+              totalMethods++;
+              totalComplexity += methodRecord.get('complexity') || 1;
+              
+              return {
+                id: `method_${methodRecord.get('name')}_${methodRecord.get('id')}`,
+                name: methodRecord.get('name'),
+                parameters: JSON.parse(methodRecord.get('parameters') || '[]'),
+                returnType: methodRecord.get('returnType') || 'void',
+                complexity: methodRecord.get('complexity') || 1,
+                startLine: methodRecord.get('startLine') || 1,
+                endLine: methodRecord.get('endLine') || 1,
+                filePath: filePath,
                 isAsync: false,
-                isExported: false,
-                visibility: 'public' as const,
+                isExported: methodRecord.get('isExported') || false,
+                visibility: methodRecord.get('visibility') || 'public' as const,
                 dependencies: [],
                 calls: []
-              })),
-            properties: [],
-            extends: undefined,
-            implements: [],
-            startLine: 1,
-            endLine: 1,
-            filePath: file.filePath,
-            isExported: concrete.actualExports.includes(className),
-            visibility: 'public' as const,
-            isAbstract: false
-          });
-        }
-        
-        // Add standalone functions
-        for (const methodSig of concrete.actualMethodSignatures) {
-          if (!methodSig.includes('.')) {
-            const funcName = methodSig.split('(')[0];
-            const funcId = `func_${funcName}_${Math.random().toString(36).substr(2, 9)}`;
+              };
+            });
+            
+            combinedAnalysis.classes.push({
+              id: classId,
+              name: entity.name,
+              methods: methods,
+              properties: [],
+              extends: undefined,
+              implements: [],
+              startLine: entity.startLine || 1,
+              endLine: entity.endLine || 1,
+              filePath: filePath,
+              isExported: entity.isExported || false,
+              visibility: entity.visibility || 'public' as const,
+              isAbstract: false
+            });
+          }
+          
+          if (entity.type === 'Method' || entity.type === 'Function') {
+            totalMethods++;
+            totalComplexity += entity.complexity || 1;
+            
             combinedAnalysis.functions.push({
-              id: funcId,
-              name: funcName,
-              parameters: [],
-              returnType: 'unknown',
-              complexity: 1,
-              startLine: 1,
-              endLine: 1,
-              filePath: file.filePath,
+              id: `func_${entity.name}_${entity.id}`,
+              name: entity.name,
+              parameters: JSON.parse(entity.parameters || '[]'),
+              returnType: entity.returnType || 'void',
+              complexity: entity.complexity || 1,
+              startLine: entity.startLine || 1,
+              endLine: entity.endLine || 1,
+              filePath: filePath,
               isAsync: false,
-              isExported: concrete.actualExports.includes(funcName),
-              visibility: 'public' as const,
+              isExported: entity.isExported || false,
+              visibility: entity.visibility || 'public' as const,
               dependencies: [],
               calls: []
             });
           }
         }
+      }
+      
+      // Query for dependencies and imports
+      const dependencyQuery = `
+        MATCH (f:File)-[:IMPORTS]->(dep)
+        WHERE f.filePath STARTS WITH $moduleDir
+        RETURN collect(DISTINCT dep.name) as dependencies
+      `;
+      
+      const depResult = await session.run(dependencyQuery, { moduleDir });
+      if (depResult.records.length > 0) {
+        const deps = depResult.records[0].get('dependencies') || [];
+        combinedAnalysis.dependencies = deps;
         
-        // Add exports
-        for (const exportName of concrete.actualExports) {
-          const exportId = `export_${exportName}_${Math.random().toString(36).substr(2, 9)}`;
-          combinedAnalysis.exports.push({
-            id: exportId,
-            name: exportName,
-            type: 'function' as const,
-            isDefault: false,
-            filePath: file.filePath,
-            startLine: 1,
-            endLine: 1
-          });
-        }
-        
-        // Add imports
-        for (const importName of concrete.actualImports) {
-          const importId = `import_${importName}_${Math.random().toString(36).substr(2, 9)}`;
+        // Create import declarations
+        for (const dep of deps) {
           combinedAnalysis.imports.push({
-            id: importId,
-            source: importName,
+            id: `import_${dep}_${Math.random().toString(36).substr(2, 9)}`,
+            source: dep,
             imports: [],
-            filePath: file.filePath,
+            filePath: moduleDir,
             startLine: 1,
             endLine: 1
           });
         }
-        
-        // Merge dependencies
-        combinedAnalysis.dependencies.push(...concrete.actualDependencies);
-        
-        // Add complexity metrics
-        combinedAnalysis.complexity.cyclomaticComplexity += concrete.qualityMetrics.complexity;
-        combinedAnalysis.complexity.maintainabilityIndex = Math.min(
-          combinedAnalysis.complexity.maintainabilityIndex,
-          concrete.qualityMetrics.maintainability
-        );
-        combinedAnalysis.complexity.linesOfCode += 100; // Estimate
+      }
+      
+      // Update complexity metrics
+      combinedAnalysis.complexity.cyclomaticComplexity = totalComplexity;
+      combinedAnalysis.complexity.linesOfCode = totalLines;
+      combinedAnalysis.complexity.maintainabilityIndex = Math.max(20, 100 - (totalComplexity / totalMethods || 1) * 10);
+      
+      await session.close();
+      await neo4jService.disconnect();
+      
+      logger.info('✅ Module analysis created with concrete Neo4j data', {
+        moduleDir,
+        filesCount: files.length,
+        classesCount: totalClasses,
+        methodsCount: totalMethods,
+        dependenciesCount: combinedAnalysis.dependencies.length,
+        totalComplexity,
+        totalLines
+      });
+      
+    } catch (error) {
+      logger.warn('⚠️ Failed to query Neo4j for concrete data, falling back to file-based analysis', { error });
+      
+      // Fallback to the original approach if Neo4j is not available
+      for (const file of files) {
+        const concrete = concreteInfo.get(file.filePath);
+        if (concrete) {
+          // Use the concrete information from the map
+          for (const className of concrete.actualClassNames) {
+            const classId = `class_${className}_${Math.random().toString(36).substr(2, 9)}`;
+            combinedAnalysis.classes.push({
+              id: classId,
+              name: className,
+              methods: [],
+              properties: [],
+              extends: undefined,
+              implements: [],
+              startLine: 1,
+              endLine: 1,
+              filePath: file.filePath,
+              isExported: concrete.actualExports.includes(className),
+              visibility: 'public' as const,
+              isAbstract: false
+            });
+          }
+          
+          combinedAnalysis.dependencies.push(...concrete.actualDependencies);
+          combinedAnalysis.complexity.cyclomaticComplexity += concrete.qualityMetrics.complexity;
+        }
       }
     }
-    
-    // Remove duplicates from dependencies
-    combinedAnalysis.dependencies = [...new Set(combinedAnalysis.dependencies)];
-    
-    logger.info('Created module analysis', {
-      moduleDir: path.dirname(files[0]?.filePath || ''),
-      filesCount: files.length,
-      classesCount: combinedAnalysis.classes.length,
-      functionsCount: combinedAnalysis.functions.length,
-      dependenciesCount: combinedAnalysis.dependencies.length,
-      exportsCount: combinedAnalysis.exports.length
-    });
     
     return combinedAnalysis;
   }

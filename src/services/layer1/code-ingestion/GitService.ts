@@ -212,18 +212,20 @@ export class GitService extends EventEmitter {
     try {
       const repoGit = simpleGit(repository.path);
       
-      // Fetch latest changes
-      await repoGit.fetch();
+      // Skip remote operations to prevent SSH authentication prompts during analysis
+      logger.info('ℹ️  Skipping Git remote operations to prevent SSH authentication prompts');
+      logger.info('💡 Local Git operations only - remote changes will not be detected automatically');
       
-      // Get current commit
+      // Get current commit (local only)
       const log = await repoGit.log(['-1']);
       const currentCommitHash = log.latest?.hash;
       
-      // Check if there are new commits
+      // Check if there are new commits (local only)
       if (currentCommitHash && currentCommitHash !== repository.lastCommitHash) {
         logger.info(`New commits detected in repository: ${repository.name}`);
+        logger.info(`Commit hash changed from ${repository.lastCommitHash} to ${currentCommitHash}`);
         
-        // Get commits since last known commit
+        // Get commits since last known commit (local only)
         const commits = await this.getCommitsSince(repository, repository.lastCommitHash);
         
         // Update repository
@@ -515,13 +517,14 @@ export class GitService extends EventEmitter {
         return;
       }
 
-      // Get repository information
+      // Get repository information (local operations only to avoid SSH prompts)
       const status = await repoGit.status();
       const log = await repoGit.log(['-1']);
-      const remotes = await repoGit.getRemotes(true);
+      
+      // Skip remote operations to prevent SSH authentication prompts
+      logger.info('ℹ️  Skipping Git remote detection to prevent SSH authentication prompts');
       
       const projectName = path.basename(currentDir);
-      const originUrl = remotes.find(r => r.name === 'origin')?.refs?.fetch;
       
       const repository: Repository = {
         id: `${projectName}-${Date.now()}`,
@@ -540,10 +543,7 @@ export class GitService extends EventEmitter {
         }
       };
 
-      // Add optional fields if they exist
-      if (originUrl) {
-        repository.url = originUrl;
-      }
+      // Add optional fields if they exist (local only)
       if (log.latest?.hash) {
         repository.lastCommitHash = log.latest.hash;
       }
@@ -554,7 +554,8 @@ export class GitService extends EventEmitter {
       logger.info('Auto-detected current project as repository', {
         name: repository.name,
         path: repository.path,
-        branch: repository.branch
+        branch: repository.branch,
+        note: 'Remote URL detection skipped to prevent SSH prompts'
       });
     } catch (error) {
       logger.debug('Failed to auto-detect current project', { error });
