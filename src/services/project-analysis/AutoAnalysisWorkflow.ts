@@ -744,18 +744,23 @@ export class AutoAnalysisWorkflow extends EventEmitter {
 
   private async createModuleAnalysis(files: any[], concreteInfo: Map<string, ConcreteInformation>): Promise<AnalysisResult> {
     // Get the module directory path
-    const moduleDir = path.dirname(files[0]?.filePath || '');
-    const moduleName = path.basename(moduleDir);
+    const fullModuleDir = path.dirname(files[0]?.filePath || '');
+    const moduleName = path.basename(fullModuleDir);
+    
+    // Convert absolute path to relative path for Neo4j query
+    const moduleDir = path.relative(this.config.projectRoot, fullModuleDir);
     
     logger.info('Creating module analysis with Neo4j data', {
+      fullModuleDir,
       moduleDir,
       moduleName,
-      filesCount: files.length
+      filesCount: files.length,
+      projectRoot: this.config.projectRoot
     });
 
     // Initialize combined analysis
     const combinedAnalysis: AnalysisResult = {
-      filePath: moduleDir,
+      filePath: fullModuleDir,
       language: files[0]?.language || 'java',
       nodes: [],
       functions: [],
