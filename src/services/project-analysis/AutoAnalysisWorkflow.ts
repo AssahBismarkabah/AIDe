@@ -747,8 +747,8 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     const fullModuleDir = path.dirname(files[0]?.filePath || '');
     const moduleName = path.basename(fullModuleDir);
     
-    // Convert absolute path to relative path for Neo4j query
-    const moduleDir = path.relative(this.config.projectRoot, fullModuleDir);
+    // Use the full absolute path for Neo4j query since that's how paths are stored
+    const moduleDir = fullModuleDir;
     
     logger.info('Creating module analysis with Neo4j data', {
       fullModuleDir,
@@ -814,7 +814,73 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       `;
       
       const session = neo4jService.getSession();
+      
+      logger.info('🔍 Neo4j Query Debug Info', {
+        query: moduleQuery.replace(/\s+/g, ' ').trim(),
+        moduleDir: moduleDir,
+        queryParams: { moduleDir },
+        moduleDirLength: moduleDir.length
+      });
+      
       const result = await session.run(moduleQuery, { moduleDir });
+      
+      logger.info('📊 Neo4j Query Results', {
+        recordCount: result.records.length,
+        moduleDir: moduleDir,
+        queryExecuted: moduleQuery.replace(/\s+/g, ' ').trim(),
+        sampleRecords: result.records.slice(0, 3).map(record => ({
+          filePath: record.get('filePath'),
+          fileName: record.get('fileName'),
+          entitiesCount: record.get('entities')?.length || 0,
+          firstEntity: record.get('entities')?.[0] || null
+        }))
+      });
+      
+      // If no records found, let's debug what's actually in Neo4j
+      if (result.records.length === 0) {
+        logger.warn('No records found for module, debugging Neo4j content', { moduleDir });
+        
+        // Query to see what files are actually in Neo4j
+        const debugQuery = `
+          MATCH (f:File)
+          WHERE f.filePath CONTAINS "properties"
+          RETURN f.filePath as filePath, f.name as fileName
+          LIMIT 10
+        `;
+        
+        const debugResult = await session.run(debugQuery);
+        const propertiesFiles = debugResult.records.map(record => ({
+          filePath: record.get('filePath'),
+          fileName: record.get('fileName')
+        }));
+        
+        logger.info('🔍 Files in Neo4j containing "properties"', {
+          query: debugQuery.replace(/\s+/g, ' ').trim(),
+          foundFilesCount: propertiesFiles.length,
+          foundFiles: propertiesFiles
+        });
+        
+        // Additional debug: Show what the moduleDir looks like vs actual stored paths
+        const allFilesQuery = `
+          MATCH (f:File)
+          RETURN f.filePath as filePath
+          LIMIT 5
+        `;
+        const allFilesResult = await session.run(allFilesQuery);
+        const samplePaths = allFilesResult.records.map(record => record.get('filePath'));
+        
+        logger.info('🔍 Sample file paths in Neo4j vs moduleDir', {
+          moduleDir: moduleDir,
+          moduleDir_length: moduleDir.length,
+          sampleStoredPaths: samplePaths,
+          pathComparison: samplePaths.map(path => ({
+            storedPath: path,
+            startsWithModuleDir: path.startsWith(moduleDir),
+            pathLength: path.length,
+            moduleDir: moduleDir
+          }))
+        });
+      }
       
       let totalClasses = 0;
       let totalMethods = 0;
@@ -1479,5 +1545,16 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     }
     
     return indicators;
+  }
+
+  /**
+   * Find common prefix between two paths for debugging
+   */
+  private findCommonPrefix(path1: string, path2: string): string {
+    let i = 0;
+    while (i < path1.length && i < path2.length && path1[i] === path2[i]) {
+      i++;
+    }
+    return path1.substring(0, i);
   }
 }
