@@ -3,6 +3,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+keycloak-config-cli/
 
 # Build outputs
 dist/
@@ -53,7 +54,6 @@ final-validation-git/
 final-test/
 neo4j-test/
 full-test/
-keycloak-config-cli
 
 # Dependency directories
 jspm_packages/

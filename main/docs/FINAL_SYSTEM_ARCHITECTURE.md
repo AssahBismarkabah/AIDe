@@ -3,27 +3,22 @@
 
 ### Executive Summary
 
-AASWE (AI-Assisted Software Engineering) is a production-ready system that enhances IDE LLMs with deep codebase knowledge through automatic analysis, semantic knowledge graphs, and intelligent context delivery. The system supports two deployment modes to accommodate different use cases and resource requirements.
+AASWE (AI-Assisted Software Engineering) is a production-ready unified system that enhances IDE LLMs with deep codebase knowledge through automatic analysis, semantic knowledge graphs, and intelligent context delivery. The system provides a single, comprehensive deployment that combines ease of use with advanced capabilities.
 
 ---
 
-## 🏗️ Two-Mode Architecture Overview
+## 🏗️ Unified Architecture Overview
 
-### Mode 1: Context-Only Mode (Recommended)
-- **Purpose**: Enhanced IDE LLM context with automatic codebase analysis
+### Single Unified Mode
+- **Purpose**: Complete AI-enhanced codebase analysis with IDE LLM integration
 - **Resource Requirements**: Medium (4GB RAM, 2 CPU cores)
-- **Setup**: Simple (`npm install @aaswe/codebase-ai` + `aaswe start`)
-- **Use Case**: Individual developers wanting enhanced IDE context
-
-### Mode 2: Full Mode (Advanced)
-- **Purpose**: Complete AI analysis platform with advanced reasoning
-- **Resource Requirements**: High (8GB RAM, 4 CPU cores)
-- **Setup**: Advanced (Docker Compose with 5-layer architecture)
-- **Use Case**: Teams needing advanced AI analysis and custom queries
+- **Setup**: Simple (`npm install -g @aaswe/codebase-ai` + `codebase-ai full-start`)
+- **Use Case**: All developers - from individuals to enterprise teams
+- **Deployment**: Single command with Docker orchestration
 
 ---
 
-## 📊 Context-Only Mode Architecture
+## 📊 Unified System Architecture
 
 ```mermaid
 graph TB
@@ -39,16 +34,24 @@ graph TB
             
             subgraph "Knowledge Layer"
                 NEO4J[(Neo4j Graph DB<br/>Port 7687)]
+                REDIS[(Redis Cache<br/>Port 6379)]
                 TTL[TTL Files<br/>.module-knowledge.ttl]
+                RDF[RDF Store<br/>In-Memory]
             end
             
             subgraph "Analysis Engine"
                 TRIGGER[NPM Install Trigger]
-                AST[AST Analysis<br/>Multi-Language]
+                AST[Multi-Language AST<br/>6+ Languages]
                 GEN[TTL Generation<br/>Concrete Info]
                 POP[Knowledge Graph<br/>Population]
                 PRESERVE[Business Context<br/>Preservation]
                 WATCH[File System<br/>Monitoring]
+            end
+            
+            subgraph "Advanced Services (Available)"
+                RAG[RAG Engine<br/>LangChain]
+                CYPHER[GraphCypher QA<br/>Neo4j Queries]
+                SPARQL[SPARQL Engine<br/>RDF Queries]
             end
         end
         
@@ -95,7 +98,7 @@ graph TB
     class SRC,PKG,CONFIG files
 ```
 
-### Context-Only Mode Data Flow
+### Unified System Data Flow
 
 ```mermaid
 sequenceDiagram
@@ -108,7 +111,7 @@ sequenceDiagram
     participant MCP as MCP Server
     participant IDE as IDE LLM
     
-    Dev->>NPM: npm install @aaswe/codebase-ai
+    Dev->>NPM: npm install -g @aaswe/codebase-ai
     NPM->>Hook: Execute postinstall script
     Hook->>AST: Trigger automatic analysis
     AST->>AST: Analyze codebase (TS/JS/Python/Java)
@@ -126,140 +129,47 @@ sequenceDiagram
 
 ---
 
-## 🧠 Full Mode Architecture (5-Layer System)
+## 🔧 Advanced Services (Available but Not Active)
 
+The system includes advanced AI services that are implemented but not currently integrated into the main workflow:
+
+### 🧠 Layer 3 AI Services
 ```mermaid
 graph TB
-    subgraph "Developer Machine"
-        subgraph "IDEs & Interfaces"
-            IDE[IDEs + LLMs]
-            WEB[Web Interface<br/>Port 3000]
-        end
+    subgraph "Available Advanced Services"
+        RAG_SVC[LangChain RAG Engine<br/>Natural Language Processing]
+        CYPHER_SVC[GraphCypher QA Chain<br/>Neo4j Query Generation]
+        SPARQL_SVC[SPARQL Query Engine<br/>RDF Knowledge Queries]
     end
     
-    subgraph "Docker Compose Stack"
-        subgraph "Layer 5: Integration & APIs"
-            MCP_FULL[MCP Server<br/>Port 8000]
-            API[API Gateway<br/>Port 8080]
-            WEB_SVC[Web Interface Service]
-        end
-        
-        subgraph "Layer 4: Developer Assistance"
-            CODE_ASSIST[Code Assistant<br/>Port 8003]
-            DOC_ASSIST[Documentation Assistant]
-            TEST_ASSIST[Test Assistant]
-            REFACTOR[Refactoring Assistant]
-        end
-        
-        subgraph "Layer 3: AI/LLM Integration"
-            LLM_GATEWAY[LLM Gateway<br/>Port 8001]
-            RAG[LangChain RAG<br/>Port 8002]
-            CYPHER[GraphCypher QA]
-            SPARQL[SPARQL Engine]
-        end
-        
-        subgraph "Layer 2: Knowledge Graph Core"
-            NEO4J_FULL[(Neo4j Database<br/>Port 7687)]
-            REDIS[(Redis Cache<br/>Port 6379)]
-            VERSION[Version Manager]
-            RDF_STORE[RDF Module Store]
-        end
-        
-        subgraph "Layer 1: Data Ingestion & Analysis"
-            INGESTION[Code Ingestion Service]
-            AST_FULL[AST Analysis Engine]
-            RDF_GEN[RDF Generator]
-            CREW[CrewAI Orchestration]
-        end
+    subgraph "Current Integration Status"
+        IMPLEMENTED[✅ Fully Implemented]
+        TESTED[✅ Unit Tested]
+        NOT_ACTIVE[❌ Not Active in Main Flow]
     end
     
-    subgraph "External Services"
-        OPENAI[OpenAI API]
-        ANTHROPIC[Anthropic API]
-        GIT[Git Repositories]
-    end
+    RAG_SVC --> IMPLEMENTED
+    CYPHER_SVC --> IMPLEMENTED
+    SPARQL_SVC --> IMPLEMENTED
     
-    %% Layer 5 Connections
-    IDE -.->|MCP Protocol| MCP_FULL
-    WEB -.->|HTTP/REST| API
-    API --> MCP_FULL
-    API --> WEB_SVC
-    
-    %% Layer 4 Connections
-    MCP_FULL --> CODE_ASSIST
-    CODE_ASSIST --> DOC_ASSIST
-    CODE_ASSIST --> TEST_ASSIST
-    CODE_ASSIST --> REFACTOR
-    
-    %% Layer 3 Connections
-    CODE_ASSIST --> LLM_GATEWAY
-    CODE_ASSIST --> RAG
-    LLM_GATEWAY --> RAG
-    LLM_GATEWAY --> CYPHER
-    LLM_GATEWAY --> SPARQL
-    
-    %% Layer 2 Connections
-    RAG --> NEO4J_FULL
-    CYPHER --> NEO4J_FULL
-    SPARQL --> RDF_STORE
-    RAG --> REDIS
-    VERSION --> NEO4J_FULL
-    
-    %% Layer 1 Connections
-    INGESTION --> AST_FULL
-    AST_FULL --> RDF_GEN
-    RDF_GEN --> NEO4J_FULL
-    RDF_GEN --> RDF_STORE
-    CREW --> INGESTION
-    
-    %% External Connections
-    LLM_GATEWAY -.->|API Calls| OPENAI
-    LLM_GATEWAY -.->|API Calls| ANTHROPIC
-    INGESTION -.->|Repository Access| GIT
+    IMPLEMENTED --> TESTED
+    TESTED --> NOT_ACTIVE
     
     %% Styling
-    classDef layer1 fill:#ffebee
-    classDef layer2 fill:#e8f5e8
-    classDef layer3 fill:#e3f2fd
-    classDef layer4 fill:#fff3e0
-    classDef layer5 fill:#f3e5f5
-    classDef external fill:#fafafa
+    classDef available fill:#e3f2fd
+    classDef status fill:#fff3e0
+    classDef inactive fill:#ffebee
     
-    class INGESTION,AST_FULL,RDF_GEN,CREW layer1
-    class NEO4J_FULL,REDIS,VERSION,RDF_STORE layer2
-    class LLM_GATEWAY,RAG,CYPHER,SPARQL layer3
-    class CODE_ASSIST,DOC_ASSIST,TEST_ASSIST,REFACTOR layer4
-    class MCP_FULL,API,WEB_SVC layer5
-    class OPENAI,ANTHROPIC,GIT external
+    class RAG_SVC,CYPHER_SVC,SPARQL_SVC available
+    class IMPLEMENTED,TESTED status
+    class NOT_ACTIVE inactive
 ```
 
-### Full Mode Service Communication
-
-```mermaid
-graph LR
-    subgraph "Communication Protocols"
-        MCP_PROTO[MCP Protocol<br/>WebSocket]
-        HTTP_REST[HTTP/REST<br/>JSON API]
-        BOLT[Bolt Protocol<br/>Neo4j]
-        REDIS_PROTO[Redis Protocol<br/>TCP]
-        FILE_SYS[File System<br/>TTL Files]
-    end
-    
-    subgraph "Service Mesh"
-        SERVICES[All Services]
-        DATABASE[Databases]
-        FILES[File Storage]
-        EXTERNAL[External APIs]
-    end
-    
-    MCP_PROTO -.-> SERVICES
-    HTTP_REST -.-> SERVICES
-    BOLT -.-> DATABASE
-    REDIS_PROTO -.-> DATABASE
-    FILE_SYS -.-> FILES
-    
-    SERVICES --> EXTERNAL
-```
+### Future Integration Potential
+These services can be activated for:
+- **Advanced Natural Language Queries**: RAG-powered codebase questions
+- **Complex Graph Analysis**: GraphCypher for relationship discovery
+- **Semantic Knowledge Queries**: SPARQL for ontology-based searches
 
 ---
 
@@ -400,51 +310,57 @@ stateDiagram-v2
 
 ---
 
-## 📊 Deployment Comparison
+## 📊 System Features & Status
 
-| Feature | Context-Only Mode | Full Mode |
-|---------|------------------|-----------|
-| **Setup Complexity** | Simple (npm install) | Advanced (Docker Compose) |
-| **Resource Usage** | 4GB RAM, 2 CPU cores | 8GB RAM, 4 CPU cores |
-| **Services** | MCP Server + Neo4j | 15+ microservices |
-| **AI Capabilities** | IDE LLM enhancement | Advanced AI analysis |
-| **Use Case** | Individual developers | Teams & enterprises |
-| **Deployment** | Single command | Docker orchestration |
-| **Maintenance** | Minimal | Moderate |
-| **Scalability** | Single machine | Horizontal scaling |
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **NPM Package** | ✅ Active | Global CLI installation |
+| **Docker Orchestration** | ✅ Active | Neo4j + Redis + MCP containers |
+| **Multi-Language Analysis** | ✅ Active | TypeScript, Java, Python, Go, Rust, C++ |
+| **TTL Generation** | ✅ Active | Concrete codebase metadata |
+| **Neo4j Knowledge Graph** | ✅ Active | Complete source code relationships |
+| **MCP Server** | ✅ Active | IDE LLM integration |
+| **Business Context Preservation** | ✅ Active | Developer enhancement protection |
+| **RAG Engine** | 🔧 Available | LangChain-powered natural language processing |
+| **GraphCypher QA** | 🔧 Available | Neo4j query generation from natural language |
+| **SPARQL Engine** | 🔧 Available | RDF knowledge base queries |
+| **Version Management** | 🔧 Available | Git-aligned versioning system |
+| **Hybrid Storage** | 🔧 Available | Multi-backend storage optimization |
 
 ---
 
 ## 🚀 Getting Started
 
-### Context-Only Mode (Recommended)
+### Unified System Deployment
 ```bash
-# Install AASWE
+# Install AASWE globally
 npm install -g @aaswe/codebase-ai
 
-# Initialize in your project
+# Navigate to your project
 cd your-project
-aaswe init
 
-# Start the system
-aaswe start --mode=context-only
+# Start the complete system (Docker containers + analysis)
+codebase-ai full-start
 
-# Configure your IDE to connect to: ws://localhost:3001
-```
-
-### Full Mode (Advanced)
-```bash
-# Clone and setup
-git clone https://github.com/aaswe/codebase-ai
-cd codebase-ai
-
-# Start full Docker stack
-aaswe docker up
+# Or run analysis only
+codebase-ai analyze
 
 # Access services:
-# - MCP Server: ws://localhost:8000
-# - Web Interface: http://localhost:3000
-# - Neo4j Browser: http://localhost:7474
+# - MCP Server: ws://localhost:3001
+# - Neo4j Browser: http://localhost:7474 (neo4j/aaswe-password)
+# - Redis: localhost:6379
+```
+
+### IDE Integration
+```bash
+# Configure your IDE MCP client to connect to:
+ws://localhost:3001
+
+# The system provides rich context including:
+# - TTL metadata files
+# - Neo4j graph relationships
+# - Multi-language source code analysis
+# - Business context preservation
 ```
 
 ---
@@ -482,11 +398,11 @@ aaswe docker up
 - ✅ Business context preservation
 - ✅ MCP server integration
 
-### Phase 2: Advanced AI (Next)
-- 🔄 Full mode deployment
-- 🔄 Advanced query capabilities
-- 🔄 Custom model training
-- 🔄 Team collaboration features
+### Phase 2: Advanced AI Integration (Next)
+- 🔄 Activate RAG Engine for natural language codebase queries
+- 🔄 Enable GraphCypher QA for complex relationship analysis
+- 🔄 Integrate SPARQL Engine for semantic knowledge queries
+- 🔄 Advanced LLM integration with custom model support
 
 ### Phase 3: Enterprise Features (Future)
 - ⏳ Multi-repository support

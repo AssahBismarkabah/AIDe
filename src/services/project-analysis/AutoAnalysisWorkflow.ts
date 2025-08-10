@@ -798,9 +798,10 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       await neo4jService.connect(config);
       
       // Query for all entities in this module directory
+      // Handle both absolute and relative paths by using CONTAINS instead of STARTS WITH
       const moduleQuery = `
         MATCH (f:File)-[:CONTAINS]->(entity)
-        WHERE f.filePath STARTS WITH $moduleDir
+        WHERE f.filePath CONTAINS $moduleDir OR f.filePath STARTS WITH $moduleDir
         RETURN f.filePath as filePath, f.name as fileName,
                collect({
                  type: labels(entity)[0],
@@ -975,7 +976,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       // Query for dependencies and imports
       const dependencyQuery = `
         MATCH (f:File)-[:IMPORTS]->(dep)
-        WHERE f.filePath STARTS WITH $moduleDir
+        WHERE f.filePath CONTAINS $moduleDir OR f.filePath STARTS WITH $moduleDir
         RETURN collect(DISTINCT dep.name) as dependencies
       `;
       
