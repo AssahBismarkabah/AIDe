@@ -768,7 +768,92 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     for (const file of files) {
       const concrete = concreteInfo.get(file.filePath);
       if (concrete) {
-        // Merge concrete information into combined analysis
+        // Create synthetic classes and functions from concrete information
+        for (const className of concrete.actualClassNames) {
+          const classId = `class_${className}_${Math.random().toString(36).substr(2, 9)}`;
+          combinedAnalysis.classes.push({
+            id: classId,
+            name: className,
+            methods: concrete.actualMethodSignatures
+              .filter(sig => sig.startsWith(className + '.'))
+              .map(sig => ({
+                id: `method_${sig}_${Math.random().toString(36).substr(2, 9)}`,
+                name: sig.split('.')[1].split('(')[0],
+                parameters: [],
+                returnType: 'unknown',
+                complexity: 1,
+                startLine: 1,
+                endLine: 1,
+                filePath: file.filePath,
+                isAsync: false,
+                isExported: false,
+                visibility: 'public' as const,
+                dependencies: [],
+                calls: []
+              })),
+            properties: [],
+            extends: undefined,
+            implements: [],
+            startLine: 1,
+            endLine: 1,
+            filePath: file.filePath,
+            isExported: concrete.actualExports.includes(className),
+            visibility: 'public' as const,
+            isAbstract: false
+          });
+        }
+        
+        // Add standalone functions
+        for (const methodSig of concrete.actualMethodSignatures) {
+          if (!methodSig.includes('.')) {
+            const funcName = methodSig.split('(')[0];
+            const funcId = `func_${funcName}_${Math.random().toString(36).substr(2, 9)}`;
+            combinedAnalysis.functions.push({
+              id: funcId,
+              name: funcName,
+              parameters: [],
+              returnType: 'unknown',
+              complexity: 1,
+              startLine: 1,
+              endLine: 1,
+              filePath: file.filePath,
+              isAsync: false,
+              isExported: concrete.actualExports.includes(funcName),
+              visibility: 'public' as const,
+              dependencies: [],
+              calls: []
+            });
+          }
+        }
+        
+        // Add exports
+        for (const exportName of concrete.actualExports) {
+          const exportId = `export_${exportName}_${Math.random().toString(36).substr(2, 9)}`;
+          combinedAnalysis.exports.push({
+            id: exportId,
+            name: exportName,
+            type: 'function' as const,
+            isDefault: false,
+            filePath: file.filePath,
+            startLine: 1,
+            endLine: 1
+          });
+        }
+        
+        // Add imports
+        for (const importName of concrete.actualImports) {
+          const importId = `import_${importName}_${Math.random().toString(36).substr(2, 9)}`;
+          combinedAnalysis.imports.push({
+            id: importId,
+            source: importName,
+            imports: [],
+            filePath: file.filePath,
+            startLine: 1,
+            endLine: 1
+          });
+        }
+        
+        // Merge dependencies
         combinedAnalysis.dependencies.push(...concrete.actualDependencies);
         
         // Add complexity metrics
@@ -783,6 +868,15 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     
     // Remove duplicates from dependencies
     combinedAnalysis.dependencies = [...new Set(combinedAnalysis.dependencies)];
+    
+    logger.info('Created module analysis', {
+      moduleDir: path.dirname(files[0]?.filePath || ''),
+      filesCount: files.length,
+      classesCount: combinedAnalysis.classes.length,
+      functionsCount: combinedAnalysis.functions.length,
+      dependenciesCount: combinedAnalysis.dependencies.length,
+      exportsCount: combinedAnalysis.exports.length
+    });
     
     return combinedAnalysis;
   }

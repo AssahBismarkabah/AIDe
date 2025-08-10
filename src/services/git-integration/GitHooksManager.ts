@@ -495,25 +495,9 @@ exit 0
     try {
       logger.info(`🚀 Triggering re-analysis for ${changedFiles.length} changed TTL files...`);
 
-      // Import and run the AutoAnalysisWorkflow
-      const { AutoAnalysisWorkflow } = await import('../project-analysis/AutoAnalysisWorkflow');
-      
-      const workflow = new AutoAnalysisWorkflow({
-        projectRoot: this.config.projectRoot,
-        outputDirectory: join(this.config.projectRoot, 'knowledge'),
-        languages: ['typescript', 'javascript', 'python', 'java'],
-        preserveBusinessContext: true,
-        enableKnowledgeGraphPopulation: false, // Git hook mode
-        enableMCPContextLoading: false // Git hook mode
-      });
-
-      const result = await workflow.executeComprehensiveAnalysis();
-      
-      logger.info('✅ Re-analysis completed successfully', {
-        filesAnalyzed: result.summary.analyzedFiles,
-        ttlFilesGenerated: result.summary.ttlFilesGenerated,
-        executionTime: `${result.duration}ms`
-      });
+      // Skip Git operations during re-analysis to prevent SSH prompts
+      logger.info('ℹ️  Skipping Git-triggered re-analysis to prevent SSH authentication prompts');
+      logger.info('💡 TTL files have been updated - manual re-analysis can be triggered with: codebase-ai analyze');
 
     } catch (error) {
       logger.error('❌ Re-analysis failed', { error });
