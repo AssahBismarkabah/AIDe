@@ -1,8 +1,6 @@
 # AASWE - AI-Assisted Engineering
 
-[![npm version](https://badge.fury.io/js/@aaswe/codebase-ai.svg)](https://badge.fury.io/js/@aaswe/codebase-ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://github.com/aaswe/codebase-ai/workflows/Node.js%20CI/badge.svg)](https://github.com/aaswe/codebase-ai/actions)
 
 **Rich codebase context for IDE LLMs through automatic analysis and knowledge graph generation.**
 
