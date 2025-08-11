@@ -8,11 +8,11 @@
 
 AASWE transforms your codebase into structured knowledge that enhances your IDE's AI capabilities. Get better code suggestions, more accurate refactoring, and deeper insights by providing your LLM with comprehensive project context.
 
-## 🚀 Quick Start
+##  Quick Start
 
-> **📦 Package Status**: Ready for NPM publication! Currently available as tarball for testing.
+> ** Package Status**: Ready for NPM publication! Currently available as tarball for testing.
 
-### Option 1: One-Command Complete Setup ⭐ (Recommended)
+### Option 1: One-Command Complete Setup  (Recommended)
 ```bash
 # Install, setup, and start complete system with all containers
 curl -fsSL https://raw.githubusercontent.com/aaswe/codebase-ai/main/scripts/one-command-deploy.sh | bash
@@ -51,38 +51,38 @@ cd codebase-ai
 docker-compose up -d
 ```
 
-## ✨ Features
+##  Features
 
-### 🧠 **Triple Context System**
+###  **Triple Context System**
 - **TTL Metadata**: Structured semantic knowledge in RDF/TTL format
 - **Neo4j Source Code**: Complete source code + relationships in graph database
 - **MCP Integration**: Universal IDE compatibility with unified context delivery
 
-### 🔍 **Multi-Language Code Analysis**
+###  **Multi-Language Code Analysis**
 - **12 Languages**: TypeScript, JavaScript, Python, Java, Go, Rust, C++, C#, PHP, Ruby, Kotlin, Scala, Swift
 - **Complete Source Storage**: Full source code stored in Neo4j for LLM queries
 - **Concrete Information**: Real class names, method signatures, dependencies
 - **Architectural Patterns**: Factory, Singleton, Observer, Builder pattern detection
 
-### 🔄 **Automatic Synchronization**
+###  **Automatic Synchronization**
 - **Git Integration**: Auto-updates on commits and merges
 - **TTL File Changes**: Automatic Neo4j knowledge graph updates
 - **Source Code Changes**: Automatic TTL regeneration + graph updates
 - **Business Context Preservation**: Maintains developer annotations during re-analysis
 
-### 🔗 **Universal IDE Integration**
+### **Universal IDE Integration**
 - **Model Context Protocol (MCP)**: Works with any MCP-compatible IDE
 - **VS Code + Continue**: Native integration
 - **Cursor**: Built-in MCP support
 - **Real-time Context**: Always-current codebase knowledge
 
-### 🐳 **One-Command Deployment**
+###  **One-Command Deployment**
 - **Complete System**: Neo4j + MCP Server + Redis with single command
 - **Lightweight Mode**: TTL-only mode for individual developers
 - **Docker Compose**: Full containerized deployment
 - **Neo4j Browser**: Built-in graph visualization and exploration
 
-## 📋 System Requirements
+##  System Requirements
 
 ### Minimum (Context-Only Mode)
 - **Node.js**: 18.0.0+
@@ -95,7 +95,7 @@ docker-compose up -d
 - **Disk**: 1GB free space
 - **Docker**: 20.0.0+ (for full system)
 
-## 🛠 Installation & Setup
+##  Installation & Setup
 
 ### Global Installation
 ```bash
@@ -120,7 +120,7 @@ AASWE creates these files:
 - `.env.aaswe` - Environment variables
 - `.aaswe/` - Analysis cache and knowledge files
 
-## 🚀 Usage
+##  Usage
 
 ### Basic Commands
 
@@ -196,7 +196,7 @@ codebase-ai docker down
 #### Other IDEs
 Connect to the MCP server at `ws://localhost:3001`
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 your-project/
@@ -212,7 +212,7 @@ your-project/
     └── ...
 ```
 
-## ⚙️ Configuration
+##  Configuration
 
 ### Basic Configuration (`aaswe.config.js`)
 ```javascript
@@ -288,7 +288,7 @@ services:
       - ./custom-config:/app/config
 ```
 
-## 📊 Monitoring & Health Checks
+##  Monitoring & Health Checks
 
 ### Health Check Endpoint
 ```bash
@@ -309,7 +309,7 @@ codebase-ai docker logs aaswe-server
 - **Neo4j Browser**: http://localhost:7474
 - **Metrics Endpoint**: http://localhost:9090/metrics
 
-## 🔍 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -371,7 +371,7 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 codebase-ai start
 ```
 
-## 🏗 Architecture
+##  Architecture
 
 ### Deployment Modes
 
@@ -392,7 +392,7 @@ codebase-ai start
 - **Protocol**: Model Context Protocol (MCP)
 - **Deployment**: Docker, Docker Compose
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
@@ -434,7 +434,7 @@ npm run test:watch
 - **[Architecture Guide](./docs/ARCHITECTURE.md)** - System design and components
 - **[Development Guide](./DEVELOPMENT.md)** - Contributing and development setup
 
-## 🔗 Links
+##  Links
 
 - **GitHub**: https://github.com/aaswe/codebase-ai
 - **NPM Package**: https://www.npmjs.com/package/@aaswe/codebase-ai
@@ -442,11 +442,11 @@ npm run test:watch
 - **Issues**: https://github.com/aaswe/codebase-ai/issues
 - **Discussions**: https://github.com/aaswe/codebase-ai/discussions
 
-## 📄 License
+##  License
 
 MIT License - see [LICENSE](./LICENSE) file for details.
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - **Model Context Protocol**: For the universal IDE integration standard
 - **Neo4j**: For the powerful graph database
