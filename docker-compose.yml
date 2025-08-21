@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # AASWE MCP Server - Main application
   aaswe-server:
