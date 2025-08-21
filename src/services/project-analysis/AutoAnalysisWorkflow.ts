@@ -752,13 +752,25 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     const relativePath = path.relative(this.config.projectRoot, fullModuleDir);
     const moduleDir = relativePath.replace(/\\/g, '/'); // Normalize path separators for cross-platform compatibility
     
+    // Create multiple path variations to handle different storage formats
+    const pathVariations = [
+      moduleDir,
+      `./${moduleDir}`,
+      `/${moduleDir}`,
+      fullModuleDir,
+      fullModuleDir.replace(/\\/g, '/'),
+      path.posix.normalize(moduleDir),
+      path.posix.normalize(relativePath)
+    ].filter((p, i, arr) => arr.indexOf(p) === i); // Remove duplicates
+    
     logger.info('Creating module analysis with Neo4j data', {
       fullModuleDir,
       moduleDir,
       moduleName,
       filesCount: files.length,
       projectRoot: this.config.projectRoot,
-      pathConversion: `${fullModuleDir} -> ${moduleDir}`
+      pathConversion: `${fullModuleDir} -> ${moduleDir}`,
+      pathVariations
     });
 
     // Initialize combined analysis
@@ -797,11 +809,12 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       
       await neo4jService.connect(config);
       
-      // Query for all entities in this module directory
-      // Handle both absolute and relative paths by using CONTAINS instead of STARTS WITH
+      // Query for all entities in this module directory with improved path matching
       const moduleQuery = `
         MATCH (f:File)-[:CONTAINS]->(entity)
-        WHERE f.filePath CONTAINS $moduleDir OR f.filePath STARTS WITH $moduleDir
+        WHERE f.filePath IN $pathVariations
+           OR ANY(pathVar IN $pathVariations WHERE f.filePath CONTAINS pathVar)
+           OR ANY(pathVar IN $pathVariations WHERE f.filePath STARTS WITH pathVar)
         RETURN f.filePath as filePath, f.name as fileName,
                collect({
                  type: labels(entity)[0],
@@ -822,11 +835,12 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       logger.info('🔍 Neo4j Query Debug Info', {
         query: moduleQuery.replace(/\s+/g, ' ').trim(),
         moduleDir: moduleDir,
-        queryParams: { moduleDir },
-        moduleDirLength: moduleDir.length
+        pathVariations,
+        queryParams: { pathVariations },
+        totalVariations: pathVariations.length
       });
       
-      const result = await session.run(moduleQuery, { moduleDir });
+      const result = await session.run(moduleQuery, { pathVariations });
       
       logger.info('📊 Neo4j Query Results', {
         recordCount: result.records.length,
@@ -842,48 +856,96 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       
       // If no records found, let's debug what's actually in Neo4j
       if (result.records.length === 0) {
-        logger.warn('No records found for module, debugging Neo4j content', { moduleDir });
+        logger.warn('No records found for module, debugging Neo4j content', { moduleDir, pathVariations });
         
         // Query to see what files are actually in Neo4j
         const debugQuery = `
           MATCH (f:File)
-          WHERE f.filePath CONTAINS "properties"
           RETURN f.filePath as filePath, f.name as fileName
-          LIMIT 10
+          ORDER BY f.filePath
+          LIMIT 20
         `;
         
         const debugResult = await session.run(debugQuery);
-        const propertiesFiles = debugResult.records.map(record => ({
+        const allFiles = debugResult.records.map(record => ({
           filePath: record.get('filePath'),
           fileName: record.get('fileName')
         }));
         
-        logger.info('🔍 Files in Neo4j containing "properties"', {
+        logger.info('🔍 All files in Neo4j vs path variations', {
           query: debugQuery.replace(/\s+/g, ' ').trim(),
-          foundFilesCount: propertiesFiles.length,
-          foundFiles: propertiesFiles
+          foundFilesCount: allFiles.length,
+          foundFiles: allFiles,
+          pathVariations,
+          pathMatches: allFiles.map(file => ({
+            filePath: file.filePath,
+            matchesAnyVariation: pathVariations.some(variation =>
+              file.filePath === variation ||
+              file.filePath.includes(variation) ||
+              file.filePath.startsWith(variation)
+            ),
+            matchingVariations: pathVariations.filter(variation =>
+              file.filePath === variation ||
+              file.filePath.includes(variation) ||
+              file.filePath.startsWith(variation)
+            )
+          })).filter(match => match.matchesAnyVariation)
         });
         
-        // Additional debug: Show what the moduleDir looks like vs actual stored paths
-        const allFilesQuery = `
+        // Try a broader query to find any files that might match
+        const broadQuery = `
           MATCH (f:File)
-          RETURN f.filePath as filePath
-          LIMIT 5
+          WHERE ANY(pathVar IN $pathVariations WHERE
+            f.filePath CONTAINS pathVar OR
+            f.name CONTAINS pathVar OR
+            f.filePath ENDS WITH pathVar
+          )
+          RETURN f.filePath as filePath, f.name as fileName
+          LIMIT 10
         `;
-        const allFilesResult = await session.run(allFilesQuery);
-        const samplePaths = allFilesResult.records.map(record => record.get('filePath'));
         
-        logger.info('🔍 Sample file paths in Neo4j vs moduleDir', {
-          moduleDir: moduleDir,
-          moduleDir_length: moduleDir.length,
-          sampleStoredPaths: samplePaths,
-          pathComparison: samplePaths.map(path => ({
-            storedPath: path,
-            startsWithModuleDir: path.startsWith(moduleDir),
-            pathLength: path.length,
-            moduleDir: moduleDir
-          }))
-        });
+        const broadResult = await session.run(broadQuery, { pathVariations });
+        const broadMatches = broadResult.records.map(record => ({
+          filePath: record.get('filePath'),
+          fileName: record.get('fileName')
+        }));
+        
+        if (broadMatches.length > 0) {
+          logger.info('🎯 Found potential matches with broader query', {
+            broadMatches,
+            willRetryWithBroaderQuery: true
+          });
+          
+          // Retry with broader query for entities
+          const retryQuery = `
+            MATCH (f:File)-[:CONTAINS]->(entity)
+            WHERE ANY(pathVar IN $pathVariations WHERE
+              f.filePath CONTAINS pathVar OR
+              f.name CONTAINS pathVar OR
+              f.filePath ENDS WITH pathVar
+            )
+            RETURN f.filePath as filePath, f.name as fileName,
+                   collect({
+                     type: labels(entity)[0],
+                     name: entity.name,
+                     id: entity.id,
+                     startLine: entity.startLine,
+                     endLine: entity.endLine,
+                     complexity: entity.complexity,
+                     visibility: entity.visibility,
+                     isExported: entity.isExported,
+                     parameters: entity.parameters,
+                     returnType: entity.returnType
+                   }) as entities
+          `;
+          
+          const retryResult = await session.run(retryQuery, { pathVariations });
+          if (retryResult.records.length > 0) {
+            // Use broad matches for analysis
+            logger.info('✅ Using broader query results for analysis');
+            result.records = retryResult.records;
+          }
+        }
       }
       
       let totalClasses = 0;
@@ -976,11 +1038,13 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       // Query for dependencies and imports
       const dependencyQuery = `
         MATCH (f:File)-[:IMPORTS]->(dep)
-        WHERE f.filePath CONTAINS $moduleDir OR f.filePath STARTS WITH $moduleDir
+        WHERE f.filePath IN $pathVariations
+           OR ANY(pathVar IN $pathVariations WHERE f.filePath CONTAINS pathVar)
+           OR ANY(pathVar IN $pathVariations WHERE f.filePath STARTS WITH pathVar)
         RETURN collect(DISTINCT dep.name) as dependencies
       `;
       
-      const depResult = await session.run(dependencyQuery, { moduleDir });
+      const depResult = await session.run(dependencyQuery, { pathVariations });
       if (depResult.records.length > 0) {
         const deps = depResult.records[0].get('dependencies') || [];
         combinedAnalysis.dependencies = deps;
