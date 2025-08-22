@@ -192,7 +192,8 @@ export class MCPStdioServer extends EventEmitter {
       
     } catch (error) {
       logger.error('Failed to process MCP message', { message: messageStr, error });
-      this.sendError(-32700, 'Parse error', { error: String(error) });
+      // Note: Parse errors don't have an ID to reference
+      this.sendError(-32700, 'Parse error', { error: String(error) }, 0);
     }
   }
 
@@ -482,10 +483,17 @@ export class MCPStdioServer extends EventEmitter {
    */
   private async handleAnalyzeCode(args: any): Promise<MCPToolResult> {
     try {
-      // Query file analysis from the hybrid storage manager
+      // Validate and sanitize the file path
+      if (!args.filePath || typeof args.filePath !== 'string') {
+        throw new MCPServerError('INVALID_PARAMS', 'Invalid filePath parameter');
+      }
+      
+      // Sanitize the file path to prevent injection
+      const sanitizedFilePath = args.filePath.replace(/["'\\]/g, '\\$&');
+      
       const analysisQuery = `
         MATCH (f:File)-[:CONTAINS]->(entity)
-        WHERE f.filePath CONTAINS "${args.filePath}"
+        WHERE f.filePath CONTAINS "${sanitizedFilePath}"
         RETURN f, collect(entity) as entities
       `;
       
@@ -740,11 +748,11 @@ export class MCPStdioServer extends EventEmitter {
   /**
    * Send error via stdout
    */
-  private sendError(code: number, message: string, data?: any): void {
+  private sendError(code: number, message: string, data?: any, id: string | number = 0): void {
     const error: MCPError = { code, message, data };
     const response: MCPResponse = {
       jsonrpc: '2.0',
-      id: 0,
+      id,
       error
     };
 

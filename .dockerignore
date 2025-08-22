@@ -4,8 +4,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build outputs (keep dist for Docker - it's built inside container)
+# Build outputs (dist is built inside container; ignore local dist to reduce context)
 build
+dist
 *.tsbuildinfo
 
 # Development files
@@ -30,6 +31,7 @@ Thumbs.db
 # Documentation (allow docs/ for Docker, but exclude other markdown)
 *.md
 !README.md
+!docs/**/*.md
 
 # Test files
 tests

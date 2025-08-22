@@ -12,22 +12,17 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files and source code
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY src/ ./src/
 
 # Install all dependencies (including dev deps for building)
-RUN npm ci --legacy-peer-deps --ignore-scripts
-
-# Copy source code and build files
-COPY src/ ./src/
+RUN npm ci --legacy-peer-deps
 COPY docker-compose.yml ./
 COPY .env.example ./
 COPY docs/ ./docs/
 COPY scripts/ ./scripts/
-
-# Build the application
-RUN npm run build
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production --legacy-peer-deps

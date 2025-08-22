@@ -753,15 +753,15 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     const moduleDir = relativePath.replace(/\\/g, '/'); // Normalize path separators for cross-platform compatibility
     
     // Create multiple path variations to handle different storage formats
-    const pathVariations = [
-      moduleDir,
-      `./${moduleDir}`,
-      `/${moduleDir}`,
-      fullModuleDir,
-      fullModuleDir.replace(/\\/g, '/'),
-      path.posix.normalize(moduleDir),
-      path.posix.normalize(relativePath)
-    ].filter((p, i, arr) => arr.indexOf(p) === i); // Remove duplicates
+    const toPosix = (p: string) => p.replace(/\\/g, '/');
+    const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
+    const pathVariations = uniq([
+      toPosix(moduleDir),
+      toPosix(relativePath),
+      toPosix(`./${moduleDir}`),
+      toPosix(`/${moduleDir}`),
+      toPosix(fullModuleDir),
+    ]);
     
     logger.info('Creating module analysis with Neo4j data', {
       fullModuleDir,
@@ -954,7 +954,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       let totalComplexity = 0;
       let totalLines = 0;
       
-      // Process each file's entities
+      // Process each file's entities  
       for (const record of result.records) {
         const filePath = record.get('filePath');
         const entities = record.get('entities');

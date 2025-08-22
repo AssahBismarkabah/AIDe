@@ -778,7 +778,19 @@ program
      // Keep the process alive for stdio transport
      if (transport === 'stdio' || transport === 'both') {
        // For stdio transport, we keep the process alive to handle stdin/stdout
-       await new Promise(() => {}); // Keep alive indefinitely
+       // Use setInterval to prevent potential memory issues with unresolved promises
+        const keepAlive = setInterval(() => {}, 1000 * 60 * 60); // Heartbeat every hour
+        process.on('beforeExit', () => clearInterval(keepAlive));
+        
+        // Wait for termination signals - this replaces the infinite promise
+        await new Promise<void>((resolve) => {
+          const handleShutdown = () => {
+            clearInterval(keepAlive);
+            resolve();
+          };
+          process.on('SIGINT', handleShutdown);
+          process.on('SIGTERM', handleShutdown);
+        });
      }
 
    } catch (error) {
