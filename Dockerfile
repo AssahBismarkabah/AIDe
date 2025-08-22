@@ -45,4 +45,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3001/health || exit 1
 
 # Start the application with dual-transport MCP server
-CMD ["node", "dist/cli/index.js", "mcp", "--transport", "both", "--neo4j-uri", "bolt://neo4j:7687", "--neo4j-username", "neo4j", "--neo4j-password", "aaswe-password"]
+CMD ["node", "dist/cli/index.js", "mcp", "--transport", "both", "--ttl-directories", "./knowledge", "--neo4j-uri", "bolt://neo4j:7687", "--neo4j-username", "neo4j", "--neo4j-password", "aaswe-password"]

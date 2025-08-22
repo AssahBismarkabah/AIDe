@@ -646,8 +646,9 @@ program
          maxCacheSize: 1000,
          relevanceThreshold: 0.1,
          maxFiles: 20,
-         maxTokens: parseInt(options.maxTokens)
-       },
+         maxTokens: parseInt(options.maxTokens),
+         directories: ttlDirectories // Add the missing directories configuration
+       } as any,
        {} as any, // Knowledge Graph Populator (not needed for this context)
        {} as any, // RDF Generator (not needed for this context)
        {} as any  // Information Extractor (not needed for this context)

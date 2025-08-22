@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2025-08-22
+
+### Critical TTL Directory Isolation Fix + Visual Documentation
+
+### Critical Fixes
+- **TTL Directory Restriction Bug**: Fixed critical issue causing MCP server to load data from multiple projects simultaneously
+  - **Root Cause**: TTLContextLoader used global glob patterns (`**/*.module-knowledge.ttl`) that searched entire filesystem
+  - **Impact**: Before fix: 82 TTL files loaded (41 AIDe + 41 target project), After fix: 41 TTL files (target project only)
+  - **Technical Solution**: Updated `loadAllTTLFiles()` and `initializeFileWatcher()` methods in `TTLContextLoader.ts`
+  - **CLI Integration**: Added missing `directories: ttlDirectories` configuration at line 650 in `cli/index.ts`
+  - **Docker Configuration**: Enhanced `Dockerfile` with `--ttl-directories ./knowledge` parameter
+
+### Validation Results
+- **TTL Context Loader**: `Successfully loaded 41/41 TTL files` (target project only)
+- **WebSocket MCP Server**: `Successfully loaded 41 TTL files` (clean data isolation)
+- **Stdio MCP Server**: `Loaded 41 TTL files in stdio server` (no cross-project contamination)
+- **MCP Data Verification**: Confirmed serving correct Java code data from keycloak project only
+
+### Documentation Enhancements
+- **Visual Overview**: Added Neo4j knowledge graph visualization to README
+  - Interactive module nodes with dependency relationships
+  - Entity metrics and architectural patterns visualization
+- **Technical Architecture**: Complete documentation of 5-layer AASWE system
+- **Multi-Project Support**: Clear project isolation and data boundaries
+
+### System Reliability
+- **Project Data Isolation**: Complete separation between different analyzed codebases
+- **MCP Server Integrity**: All three TTL loading mechanisms now respect directory restrictions
+- **Docker Volume Mapping**: Proper `${ANALYSIS_PROJECT_PATH:-./}/knowledge:/app/knowledge` configuration
+- **Container Health**: Validated full system operation with Neo4j + Redis + MCP server stack
+
+---
+
 ## [1.1.1] - 2025-08-22
 
 ### 🔒 Security & Reliability Release - CodeRabbit Fixes

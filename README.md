@@ -48,6 +48,18 @@ npm run build
 node dist/cli/index.js full-start --build
 ```
 
+##  Visual Overview
+
+![Neo4j Knowledge Graph](main/docs/Screenshot%20from%202025-08-22%2016-24-47.png)
+
+**Live Knowledge Graph Visualization** - AASWE automatically generates comprehensive Neo4j graph databases showing your codebase structure. The example above shows a  Java java codebase:
+
+- ** Module Nodes**: Each directory/module represented as connected nodes
+- ** Dependency Relationships**: Clear visualization of how modules depend on each other
+- ** Entity Metrics**: Real class, method, and function counts displayed on nodes
+- ** Architecture Patterns**: Visual detection of architectural layers and patterns
+- **Interactive Exploration**: Click and explore your codebase structure in real-time
+
 ##  Features
 
 ###  **Semantic Knowledge Generation**
