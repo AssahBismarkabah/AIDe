@@ -809,12 +809,13 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       
       await neo4jService.connect(config);
       
-      // Query for all entities in this module directory with improved path matching
+      // Query for all entities in this module directory with simple string matching that works
       const moduleQuery = `
         MATCH (f:File)-[:CONTAINS]->(entity)
-        WHERE f.filePath IN $pathVariations
-           OR ANY(pathVar IN $pathVariations WHERE f.filePath CONTAINS pathVar)
-           OR ANY(pathVar IN $pathVariations WHERE f.filePath STARTS WITH pathVar)
+        WHERE f.filePath CONTAINS '${moduleDir}'
+           OR f.filePath CONTAINS './${moduleDir}'
+           OR f.filePath CONTAINS '/${moduleDir}'
+           OR f.filePath CONTAINS '${fullModuleDir}'
         RETURN f.filePath as filePath, f.name as fileName,
                collect({
                  type: labels(entity)[0],
@@ -840,7 +841,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
         totalVariations: pathVariations.length
       });
       
-      const result = await session.run(moduleQuery, { pathVariations });
+      const result = await session.run(moduleQuery);
       
       logger.info('📊 Neo4j Query Results', {
         recordCount: result.records.length,
@@ -1035,16 +1036,17 @@ export class AutoAnalysisWorkflow extends EventEmitter {
         }
       }
       
-      // Query for dependencies and imports
+      // Query for dependencies and imports with simple string matching
       const dependencyQuery = `
         MATCH (f:File)-[:IMPORTS]->(dep)
-        WHERE f.filePath IN $pathVariations
-           OR ANY(pathVar IN $pathVariations WHERE f.filePath CONTAINS pathVar)
-           OR ANY(pathVar IN $pathVariations WHERE f.filePath STARTS WITH pathVar)
+        WHERE f.filePath CONTAINS '${moduleDir}'
+           OR f.filePath CONTAINS './${moduleDir}'
+           OR f.filePath CONTAINS '/${moduleDir}'
+           OR f.filePath CONTAINS '${fullModuleDir}'
         RETURN collect(DISTINCT dep.name) as dependencies
       `;
       
-      const depResult = await session.run(dependencyQuery, { pathVariations });
+      const depResult = await session.run(dependencyQuery);
       if (depResult.records.length > 0) {
         const deps = depResult.records[0].get('dependencies') || [];
         combinedAnalysis.dependencies = deps;

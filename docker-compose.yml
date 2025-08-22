@@ -16,9 +16,13 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       - ./data:/app/data
-      - ./knowledge:/app/knowledge
+      - ${ANALYSIS_PROJECT_PATH:-./}:/app/analysis-project
+      - ${ANALYSIS_PROJECT_PATH:-./}/knowledge:/app/knowledge
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - aaswe-network

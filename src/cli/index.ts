@@ -13,8 +13,12 @@ import { existsSync } from 'fs';
 import { writeFile, mkdir } from 'fs/promises';
 import logger from '../utils/logger';
 import { MCPServer, createDefaultMCPConfig } from '../services/mcp-server';
+import { MCPServerManager, TransportType, MCPServerManagerConfig } from '../services/mcp-server/MCPServerManager';
+import { TTLContextLoader } from '../services/mcp-server/TTLContextLoader';
 import { Layer3AIService } from '../services/layer3';
 import { HybridStorageManager } from '../services/layer2/hybrid-storage/HybridStorageManager';
+import { InMemoryRDFStore } from '../services/layer2/in-memory-rdf';
+import { Neo4jDatabaseService } from '../services/layer2/neo4j-database';
 
 // Load environment variables from .env.aaswe
 config({ path: '.env.aaswe' });
@@ -22,13 +26,22 @@ config({ path: '.env.aaswe' });
 // Also try loading from .env as fallback
 config();
 
+// Get version from package.json automatically
+let packageVersion = '1.0.0';
+try {
+  const packageJson = require('../../package.json');
+  packageVersion = packageJson.version || '1.0.0';
+} catch (error) {
+  logger.warn('Could not read package.json version, using default', { error });
+}
+
 const program = new Command();
 
 program
   .name('codebase-ai')
   .alias('aaswe')
   .description('AI-Assisted Software Engineering (AASWE) - Rich codebase context for IDE LLMs')
-  .version('1.0.0');
+  .version(packageVersion);
 
 /**
  * Start command - Launch AASWE server
@@ -204,17 +217,23 @@ program
       const path = require('path');
       const fs = require('fs');
       
-      // Get the directory where this CLI script is installed
-      const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
-      const packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath))); // Go up from dist/cli to package root
-      const dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+      // Prefer local docker-compose.yml if it exists, otherwise use NPM package version
+      let packageRoot = process.cwd();
+      let dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
       
-      // Verify docker-compose.yml exists in package
       if (!fs.existsSync(dockerComposePath)) {
-        logger.error('❌ AASWE docker-compose.yml not found in package');
-        logger.error(`Expected at: ${dockerComposePath}`);
-        logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
-        process.exit(1);
+        // Fall back to NPM package docker-compose.yml
+        const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
+        packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath))); // Go up from dist/cli to package root
+        dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+        
+        // Verify docker-compose.yml exists in package
+        if (!fs.existsSync(dockerComposePath)) {
+          logger.error('❌ AASWE docker-compose.yml not found in package or current directory');
+          logger.error(`Expected at: ${dockerComposePath} or ${path.join(process.cwd(), 'docker-compose.yml')}`);
+          logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
+          process.exit(1);
+        }
       }
       
       logger.info('🚀 Starting Complete AASWE System with All Containers...');
@@ -480,8 +499,298 @@ program
   });
 
 /**
- * Docker commands
- */
+* MCP Server Command
+*
+* Start MCP server with dual transport support for IDE integration
+*/
+program
+ .command('mcp')
+ .description('Start MCP server for IDE integration with dual transport support')
+ .option('-t, --transport <type>', 'Transport type: websocket, stdio, or both', 'both')
+ .option('-p, --port <number>', 'WebSocket server port', '3001')
+ .option('-h, --host <host>', 'WebSocket server host', 'localhost')
+ .option('--ttl-patterns <patterns>', 'TTL file patterns (comma-separated)', '**/*.module-knowledge.ttl')
+ .option('--ttl-directories <dirs>', 'TTL directories to watch (comma-separated)', './')
+ .option('--neo4j-uri <uri>', 'Neo4j URI', 'bolt://localhost:7687')
+ .option('--neo4j-username <username>', 'Neo4j username', 'neo4j')
+ .option('--neo4j-password <password>', 'Neo4j password', 'aaswe-password')
+ .option('--max-tokens <number>', 'Maximum tokens per context request', '10000')
+ .option('--cache-enabled', 'Enable context caching', true)
+ .option('--watch-enabled', 'Enable TTL file watching', true)
+ .option('--debug', 'Enable debug logging')
+ .action(async (options) => {
+   try {
+     if (options.debug) {
+       process.env.LOG_LEVEL = 'debug';
+     }
+
+     console.log(`\n🚀 Starting MCP Server (v${packageVersion})`);
+     console.log(`📡 Transport: ${options.transport}`);
+     
+     // Validate transport type
+     const transport = options.transport as TransportType;
+     if (!['websocket', 'stdio', 'both'].includes(transport)) {
+       throw new Error(`Invalid transport type: ${transport}. Must be websocket, stdio, or both.`);
+     }
+
+     // Parse configuration
+     const ttlPatterns = options.ttlPatterns.split(',').map((p: string) => p.trim());
+     const ttlDirectories = options.ttlDirectories.split(',').map((d: string) => d.trim());
+     
+     console.log(`📁 TTL Directories: ${ttlDirectories.join(', ')}`);
+     console.log(`🔍 TTL Patterns: ${ttlPatterns.join(', ')}`);
+
+     // Initialize services
+     console.log('🔧 Initializing services...');
+
+     // Neo4j Database Service
+     const neo4jService = new Neo4jDatabaseService();
+     await neo4jService.connect({
+       uri: options.neo4jUri,
+       username: options.neo4jUsername,
+       password: options.neo4jPassword,
+       database: 'neo4j',
+       encrypted: false
+     });
+     console.log('✅ Neo4j connected');
+
+     // In-Memory RDF Store
+     const rdfStore = new InMemoryRDFStore({
+       maxTriples: 100000,
+       enableInference: false,
+       enabledIndexes: ['spo', 'pos', 'osp'], // Required for proper indexing
+       prefixes: {
+         'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+         'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+         'code': 'http://example.org/code#'
+       }
+     } as any);
+     await rdfStore.initialize();
+     console.log('✅ RDF store initialized');
+
+     // Simplified Hybrid Storage Manager (TTL Context Loader handles file loading)
+     const hybridStorage = new HybridStorageManager({
+       neo4j: {
+         uri: options.neo4jUri,
+         username: options.neo4jUsername,
+         password: options.neo4jPassword,
+         database: 'neo4j',
+         maxConnectionPoolSize: 50,
+         connectionTimeout: 30000,
+         maxTransactionRetryTime: 15000
+       },
+       inMemory: {
+         maxSize: 10000,
+         ttl: 300000
+       },
+       cache: {
+         ttl: 300000,
+         maxSize: 1000
+       },
+       queryRouting: {
+         primaryLayer: 'inMemory' as any,
+         fallbackOrder: ['inMemory'] as any[],
+         routingRules: []
+       },
+       synchronization: {
+         enabled: false,
+         syncInterval: 60000,
+         conflictResolution: 'last_write_wins',
+         batchSize: 100,
+         maxRetries: 3,
+         syncStrategies: []
+       },
+       monitoring: {
+         enabled: false, // Disable to prevent RDF metrics errors
+         healthCheckInterval: 30000,
+         metricsCollectionInterval: 60000,
+         alertThresholds: {
+           errorRate: 0.1,
+           responseTime: 5000,
+           memoryUsage: 0.8,
+           diskUsage: 0.8
+         },
+         retentionPeriod: 86400000
+       }
+     } as any);
+     
+     try {
+       await hybridStorage.initialize();
+       console.log('✅ Hybrid storage initialized');
+     } catch (error) {
+       console.log('⚠️ Hybrid storage partially initialized (some components disabled)');
+     }
+
+     // Create minimal Layer 3 AI service (disable advanced AI to avoid dependencies)
+     console.log('⚠️  AI services disabled (avoiding API dependencies) - continuing with basic functionality');
+     const layer3Service = {
+       query: async () => ({ query: '', type: 'rag' as const, answer: 'AI services disabled for basic deployment', confidence: 0, sources: [], explanation: 'Advanced AI features require API configuration', metadata: { processingTime: 0, service: 'rag' as const, cached: false, queryId: '', timestamp: Date.now() } }),
+       initialize: async () => {},
+       shutdown: async () => {},
+       getStatus: () => ({ overall: 'degraded' as const, services: { rag: { name: 'rag', enabled: false, healthy: false, lastCheck: new Date() }, graphCypher: { name: 'graphCypher', enabled: false, healthy: false, lastCheck: new Date() }, sparql: { name: 'sparql', enabled: false, healthy: false, lastCheck: new Date() } }, lastUpdated: new Date() }),
+       getMetrics: () => ({ overall: { totalQueries: 0, successfulQueries: 0, failedQueries: 0, averageResponseTime: 0, queriesPerSecond: 0 }, services: { rag: { queries: 0, successRate: 0, averageResponseTime: 0, cacheHitRate: 0 }, graphCypher: { queries: 0, successRate: 0, averageResponseTime: 0, averageConfidence: 0 }, sparql: { queries: 0, successRate: 0, averageResponseTime: 0, averageConfidence: 0 } }, routing: { autoDetected: 0, manuallySpecified: 0, routingAccuracy: 0, fallbackUsed: 0 }, performance: { memoryUsage: 0, cpuUsage: 0, cacheSize: 0, activeConnections: 0 } })
+     } as any;
+
+     // TTL Context Loader
+     const ttlContextLoader = new TTLContextLoader(
+       {
+         watchEnabled: options.watchEnabled,
+         watchPatterns: ttlPatterns,
+         watchIgnored: [/node_modules/, /.git/, /dist/, /build/],
+         watchDebounce: 1000,
+         loadPatterns: ttlPatterns,
+         loadIgnored: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
+         loadConcurrency: 5,
+         cacheEnabled: options.cacheEnabled,
+         cacheTtl: 300000,
+         maxCacheSize: 1000,
+         relevanceThreshold: 0.1,
+         maxFiles: 20,
+         maxTokens: parseInt(options.maxTokens)
+       },
+       {} as any, // Knowledge Graph Populator (not needed for this context)
+       {} as any, // RDF Generator (not needed for this context)
+       {} as any  // Information Extractor (not needed for this context)
+     );
+     await ttlContextLoader.start();
+     console.log('✅ TTL context loader started');
+
+     // MCP Server Configuration
+     const mcpConfig: MCPServerManagerConfig = {
+       transport,
+       server: {
+         name: 'AASWE MCP Server',
+         version: packageVersion,
+         host: options.host,
+         port: parseInt(options.port),
+         maxConnections: 100,
+         timeout: 30000
+       },
+       ttl: {
+         watchEnabled: options.watchEnabled,
+         watchDebounce: 1000,
+         maxFileSize: 1024 * 1024,
+         encoding: 'utf-8',
+         directories: ttlDirectories,
+         patterns: ttlPatterns
+       },
+       context: {
+         maxTokens: parseInt(options.maxTokens),
+         maxFiles: 20,
+         relevanceThreshold: 0.1,
+         cacheEnabled: options.cacheEnabled,
+         cacheTtl: 300000
+       },
+       integration: {
+         layer3Config: {} as any,
+         neo4jEnabled: true,
+         rdfStoreEnabled: true,
+         hybridStorageEnabled: true
+       },
+       ide: {
+         vscode: {
+           enabled: true,
+           extensionId: 'aaswe.mcp-server',
+           contextWindow: 8000
+         },
+         intellij: {
+           enabled: false,
+           pluginId: 'aaswe.mcp-plugin',
+           contextWindow: 8000
+         }
+       }
+     };
+
+     // Start MCP Server Manager
+     console.log('🌐 Starting MCP Server Manager...');
+     const mcpServerManager = new MCPServerManager(
+       mcpConfig,
+       layer3Service,
+       hybridStorage,
+       ttlContextLoader
+     );
+
+     await mcpServerManager.start();
+
+     // Setup event handlers
+     mcpServerManager.on('client_connected', (data) => {
+       console.log(`👤 Client connected via ${data.transport}: ${data.name || 'Unknown'}`);
+     });
+
+     mcpServerManager.on('client_disconnected', (data) => {
+       console.log(`👋 Client disconnected from ${data.transport}`);
+     });
+
+     mcpServerManager.on('query_completed', (data) => {
+       logger.debug('Query completed', { transport: data.transport, query: data.query });
+     });
+
+     mcpServerManager.on('query_failed', (data) => {
+       logger.warn('Query failed', { transport: data.transport, query: data.query, error: data.error });
+     });
+
+     // Display server information
+     console.log('\n🎉 MCP Server started successfully!');
+     console.log('\n📊 Server Information:');
+     console.log(`  Version: ${packageVersion}`);
+     console.log(`  Transport: ${transport}`);
+     
+     const activeTransports = mcpServerManager.getActiveTransports();
+     console.log(`  Active Transports: ${activeTransports.join(', ')}`);
+     
+     if (activeTransports.includes('websocket')) {
+       console.log(`  WebSocket: ws://${options.host}:${options.port}`);
+     }
+     
+     if (activeTransports.includes('stdio')) {
+       console.log(`  Stdio: Ready for stdin/stdout communication`);
+     }
+     
+     console.log(`  TTL Files: ${ttlContextLoader.getTTLFiles().size} loaded`);
+
+     // Display usage information
+     console.log('\n📖 Usage:');
+     console.log('  For Cline/RooCode: Configure MCP settings to use stdio transport');
+     console.log('  For other IDEs: Connect via WebSocket to the displayed URL');
+     console.log('  Press Ctrl+C to stop the server');
+
+     // Handle graceful shutdown
+     const shutdown = async (signal: string) => {
+       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+       
+       try {
+         await mcpServerManager.stop();
+         await ttlContextLoader.stop();
+         await layer3Service.shutdown();
+         await hybridStorage.shutdown();
+         await neo4jService.disconnect();
+         console.log('✅ Server stopped successfully');
+         process.exit(0);
+       } catch (error) {
+         logger.error('Error during shutdown', { error });
+         process.exit(1);
+       }
+     };
+
+     process.on('SIGINT', () => shutdown('SIGINT'));
+     process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+     // Keep the process alive for stdio transport
+     if (transport === 'stdio' || transport === 'both') {
+       // For stdio transport, we keep the process alive to handle stdin/stdout
+       await new Promise(() => {}); // Keep alive indefinitely
+     }
+
+   } catch (error) {
+     logger.error('Failed to start MCP server', { error });
+     console.error('\n❌ Failed to start MCP server:', error instanceof Error ? error.message : String(error));
+     process.exit(1);
+   }
+ });
+
+/**
+* Docker commands
+*/
 const dockerCmd = program
   .command('docker')
   .description('Docker-related commands');
