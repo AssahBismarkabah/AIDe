@@ -190,7 +190,14 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       generateTTL: true,
       enableWatching: false, // Controlled by trigger system
       preserveBusinessContext: this.config.preserveBusinessContext,
-      analysisDepth: this.config.analysisDepth
+      analysisDepth: this.config.analysisDepth,
+      // CRITICAL FIX: Pass RDF configuration to ProjectAnalysisService
+      rdfGenerationOptions: {
+        includeBusinessContext: this.config.enableBusinessContextPlaceholders,
+        generatePlaceholders: this.config.enableBusinessContextPlaceholders,
+        optimizeForLLM: true,
+        optimizeForNeo4j: this.config.enableKnowledgeGraphPopulation
+      }
     });
 
     this.rdfService = new RDFService({
@@ -203,7 +210,14 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     this.moduleKnowledgeManager = new ModuleKnowledgeManager({
       preserveBusinessContext: this.config.preserveBusinessContext,
       enableConflictResolution: true,
-      enableLLMPreview: this.config.enableMCPContextLoading
+      enableLLMPreview: this.config.enableMCPContextLoading,
+      // CRITICAL FIX: Pass RDF generation options to prevent business context placeholders
+      rdfGenerationOptions: {
+        includeBusinessContext: this.config.enableBusinessContextPlaceholders,
+        generatePlaceholders: this.config.enableBusinessContextPlaceholders,
+        optimizeForLLM: true,
+        optimizeForNeo4j: this.config.enableKnowledgeGraphPopulation
+      }
     });
 
     // Initialize business context preserver
@@ -274,9 +288,9 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       logger.info('Phase 2: Extracting concrete information');
       const concreteInformation = await this.extractConcreteInformation(standardResult);
       
-      // Phase 3: Generate enhanced TTL files
-      logger.info('Phase 3: Generating enhanced TTL files');
-      const ttlResults = await this.generateEnhancedTTLFiles(standardResult, concreteInformation);
+      // Phase 3: Aggregate TTL files to output directory
+      logger.info('Phase 3: Aggregating TTL files to output directory');
+      const ttlResults = await this.aggregateTTLFilesToOutputDirectory(standardResult);
       
       // Phase 4: Populate knowledge graph
       let knowledgeGraphStats = { nodes: 0, relationships: 0 };
@@ -541,21 +555,23 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     } catch (error) {
       logger.warn('⚠️ MultiLanguageCodeGraphAnalyzer failed, falling back to old analyzers', { error });
       
-      // Fallback to old analyzer approach
+      // Fallback to old analyzer approach - use existing analysisResult from ProjectAnalysisService
       for (const fileResult of analysisResult.files) {
-        if (fileResult.status !== 'success') {
+        if (fileResult.status !== 'success' || !fileResult.analysisResult) {
           continue;
         }
 
         try {
-          const analyzer = this.analyzers.get(fileResult.language);
-          if (!analyzer) {
-            continue;
-          }
-
-          const detailedAnalysis = await analyzer.analyzeFile(fileResult.filePath);
-          const concrete = await this.buildConcreteInformation(detailedAnalysis);
+          // Use the analysisResult we already have instead of re-analyzing
+          const concrete = await this.buildConcreteInformation(fileResult.analysisResult);
           concreteInfo.set(fileResult.filePath, concrete);
+
+          logger.debug('✅ Used existing analysis result for concrete extraction', {
+            filePath: fileResult.filePath,
+            classes: fileResult.analysisResult.classes.length,
+            functions: fileResult.analysisResult.functions.length,
+            imports: fileResult.analysisResult.imports.length
+          });
 
         } catch (error) {
           logger.warn('Failed to extract concrete information', {
@@ -681,6 +697,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     return Math.round((documentedElements / totalElements) * 100);
   }
 
+  // @ts-ignore - Method preserved for future use but currently disabled
   private async generateEnhancedTTLFiles(
     analysisResult: ProjectAnalysisResult,
     concreteInfo: Map<string, ConcreteInformation>
@@ -688,6 +705,7 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     const ttlResults = new Map();
     const enhancedRdfGenerator = new EnhancedRDFGenerator({
       includeBusinessContext: this.config.enableBusinessContextPlaceholders,
+      generatePlaceholders: this.config.enableBusinessContextPlaceholders, // CRITICAL FIX: Add missing generatePlaceholders flag
       optimizeForLLM: this.config.enableMCPContextLoading,
       optimizeForNeo4j: this.config.enableKnowledgeGraphPopulation
     });
@@ -742,35 +760,16 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     return groups;
   }
 
-  private async createModuleAnalysis(files: any[], concreteInfo: Map<string, ConcreteInformation>): Promise<AnalysisResult> {
+  private async createModuleAnalysis(files: any[], _concreteInfo: Map<string, ConcreteInformation>): Promise<AnalysisResult> {
     // Get the module directory path
     const fullModuleDir = path.dirname(files[0]?.filePath || '');
     const moduleName = path.basename(fullModuleDir);
     
-    // Convert to relative path for Neo4j query since Neo4j stores relative paths
-    // Remove the project root to get the relative path that matches Neo4j storage
-    const relativePath = path.relative(this.config.projectRoot, fullModuleDir);
-    const moduleDir = relativePath.replace(/\\/g, '/'); // Normalize path separators for cross-platform compatibility
-    
-    // Create multiple path variations to handle different storage formats
-    const toPosix = (p: string) => p.replace(/\\/g, '/');
-    const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
-    const pathVariations = uniq([
-      toPosix(moduleDir),
-      toPosix(relativePath),
-      toPosix(`./${moduleDir}`),
-      toPosix(`/${moduleDir}`),
-      toPosix(fullModuleDir),
-    ]);
-    
-    logger.info('Creating module analysis with Neo4j data', {
+    logger.info('🏗️ Creating comprehensive module analysis', {
       fullModuleDir,
-      moduleDir,
       moduleName,
       filesCount: files.length,
-      projectRoot: this.config.projectRoot,
-      pathConversion: `${fullModuleDir} -> ${moduleDir}`,
-      pathVariations
+      fileNames: files.map(f => path.basename(f.filePath))
     });
 
     // Initialize combined analysis
@@ -794,325 +793,110 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       timestamp: new Date()
     };
 
-    try {
-      // Query Neo4j directly for concrete information about all files in this module
-      const { Neo4jDatabaseService } = await import('../layer2/neo4j-database/Neo4jDatabaseService');
-      const neo4jService = new Neo4jDatabaseService();
-      
-      const config = {
-        uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
-        username: process.env.NEO4J_USERNAME || 'neo4j',
-        password: process.env.NEO4J_PASSWORD || 'aaswe-password',
-        database: 'neo4j',
-        encrypted: false
-      };
-      
-      await neo4jService.connect(config);
-      
-      // Query for all entities in this module directory with simple string matching that works
-      const moduleQuery = `
-        MATCH (f:File)-[:CONTAINS]->(entity)
-        WHERE f.filePath CONTAINS '${moduleDir}'
-           OR f.filePath CONTAINS './${moduleDir}'
-           OR f.filePath CONTAINS '/${moduleDir}'
-           OR f.filePath CONTAINS '${fullModuleDir}'
-        RETURN f.filePath as filePath, f.name as fileName,
-               collect({
-                 type: labels(entity)[0],
-                 name: entity.name,
-                 id: entity.id,
-                 startLine: entity.startLine,
-                 endLine: entity.endLine,
-                 complexity: entity.complexity,
-                 visibility: entity.visibility,
-                 isExported: entity.isExported,
-                 parameters: entity.parameters,
-                 returnType: entity.returnType
-               }) as entities
-      `;
-      
-      const session = neo4jService.getSession();
-      
-      logger.info('🔍 Neo4j Query Debug Info', {
-        query: moduleQuery.replace(/\s+/g, ' ').trim(),
-        moduleDir: moduleDir,
-        pathVariations,
-        queryParams: { pathVariations },
-        totalVariations: pathVariations.length
-      });
-      
-      const result = await session.run(moduleQuery);
-      
-      logger.info('📊 Neo4j Query Results', {
-        recordCount: result.records.length,
-        moduleDir: moduleDir,
-        queryExecuted: moduleQuery.replace(/\s+/g, ' ').trim(),
-        sampleRecords: result.records.slice(0, 3).map(record => ({
-          filePath: record.get('filePath'),
-          fileName: record.get('fileName'),
-          entitiesCount: record.get('entities')?.length || 0,
-          firstEntity: record.get('entities')?.[0] || null
-        }))
-      });
-      
-      // If no records found, let's debug what's actually in Neo4j
-      if (result.records.length === 0) {
-        logger.warn('No records found for module, debugging Neo4j content', { moduleDir, pathVariations });
+    // CRITICAL FIX: Combine analysis results from ALL files in the module
+    let totalComplexity = 0;
+    let totalLines = 0;
+    let totalMethods = 0;
+    const allDependencies: string[] = [];
+    const allImports: string[] = [];
+    const allExports: string[] = [];
+
+    for (const file of files) {
+      if (file.status === 'success' && file.analysisResult) {
+        const fileAnalysis = file.analysisResult;
         
-        // Query to see what files are actually in Neo4j
-        const debugQuery = `
-          MATCH (f:File)
-          RETURN f.filePath as filePath, f.name as fileName
-          ORDER BY f.filePath
-          LIMIT 20
-        `;
-        
-        const debugResult = await session.run(debugQuery);
-        const allFiles = debugResult.records.map(record => ({
-          filePath: record.get('filePath'),
-          fileName: record.get('fileName')
-        }));
-        
-        logger.info('🔍 All files in Neo4j vs path variations', {
-          query: debugQuery.replace(/\s+/g, ' ').trim(),
-          foundFilesCount: allFiles.length,
-          foundFiles: allFiles,
-          pathVariations,
-          pathMatches: allFiles.map(file => ({
-            filePath: file.filePath,
-            matchesAnyVariation: pathVariations.some(variation =>
-              file.filePath === variation ||
-              file.filePath.includes(variation) ||
-              file.filePath.startsWith(variation)
-            ),
-            matchingVariations: pathVariations.filter(variation =>
-              file.filePath === variation ||
-              file.filePath.includes(variation) ||
-              file.filePath.startsWith(variation)
-            )
-          })).filter(match => match.matchesAnyVariation)
+        logger.debug('📝 Combining file analysis', {
+          filePath: file.filePath,
+          classes: fileAnalysis.classes?.length || 0,
+          functions: fileAnalysis.functions?.length || 0,
+          methods: fileAnalysis.classes?.reduce((sum: number, cls: any) => sum + (cls.methods?.length || 0), 0) || 0
         });
-        
-        // Try a broader query to find any files that might match
-        const broadQuery = `
-          MATCH (f:File)
-          WHERE ANY(pathVar IN $pathVariations WHERE
-            f.filePath CONTAINS pathVar OR
-            f.name CONTAINS pathVar OR
-            f.filePath ENDS WITH pathVar
-          )
-          RETURN f.filePath as filePath, f.name as fileName
-          LIMIT 10
-        `;
-        
-        const broadResult = await session.run(broadQuery, { pathVariations });
-        const broadMatches = broadResult.records.map(record => ({
-          filePath: record.get('filePath'),
-          fileName: record.get('fileName')
-        }));
-        
-        if (broadMatches.length > 0) {
-          logger.info('🎯 Found potential matches with broader query', {
-            broadMatches,
-            willRetryWithBroaderQuery: true
-          });
-          
-          // Retry with broader query for entities
-          const retryQuery = `
-            MATCH (f:File)-[:CONTAINS]->(entity)
-            WHERE ANY(pathVar IN $pathVariations WHERE
-              f.filePath CONTAINS pathVar OR
-              f.name CONTAINS pathVar OR
-              f.filePath ENDS WITH pathVar
-            )
-            RETURN f.filePath as filePath, f.name as fileName,
-                   collect({
-                     type: labels(entity)[0],
-                     name: entity.name,
-                     id: entity.id,
-                     startLine: entity.startLine,
-                     endLine: entity.endLine,
-                     complexity: entity.complexity,
-                     visibility: entity.visibility,
-                     isExported: entity.isExported,
-                     parameters: entity.parameters,
-                     returnType: entity.returnType
-                   }) as entities
-          `;
-          
-          const retryResult = await session.run(retryQuery, { pathVariations });
-          if (retryResult.records.length > 0) {
-            // Use broad matches for analysis
-            logger.info('✅ Using broader query results for analysis');
-            result.records = retryResult.records;
+
+        // Combine classes from this file
+        if (fileAnalysis.classes) {
+          for (const cls of fileAnalysis.classes) {
+            combinedAnalysis.classes.push({
+              ...cls,
+              filePath: file.filePath, // Ensure file path is set
+              id: `${cls.name}_${file.filePath.replace(/[^a-zA-Z0-9]/g, '_')}`
+            });
+            totalMethods += cls.methods?.length || 0;
           }
         }
-      }
-      
-      let totalClasses = 0;
-      let totalMethods = 0;
-      let totalComplexity = 0;
-      let totalLines = 0;
-      
-      // Process each file's entities  
-      for (const record of result.records) {
-        const filePath = record.get('filePath');
-        const entities = record.get('entities');
-        
-        totalLines += 50; // Estimate lines per file
-        
-        for (const entity of entities) {
-          if (entity.type === 'Class') {
-            totalClasses++;
-            const classId = `class_${entity.name}_${entity.id}`;
-            
-            // Query for methods in this class
-            const methodQuery = `
-              MATCH (c:Class {id: $classId})-[:HAS_METHOD]->(m:Method)
-              RETURN m.name as name, m.id as id, m.parameters as parameters,
-                     m.returnType as returnType, m.complexity as complexity,
-                     m.startLine as startLine, m.endLine as endLine,
-                     m.visibility as visibility, m.isExported as isExported
-            `;
-            
-            const methodResult = await session.run(methodQuery, { classId: entity.id });
-            const methods = methodResult.records.map(methodRecord => {
-              totalMethods++;
-              totalComplexity += methodRecord.get('complexity') || 1;
-              
-              return {
-                id: `method_${methodRecord.get('name')}_${methodRecord.get('id')}`,
-                name: methodRecord.get('name'),
-                parameters: JSON.parse(methodRecord.get('parameters') || '[]'),
-                returnType: methodRecord.get('returnType') || 'void',
-                complexity: methodRecord.get('complexity') || 1,
-                startLine: methodRecord.get('startLine') || 1,
-                endLine: methodRecord.get('endLine') || 1,
-                filePath: filePath,
-                isAsync: false,
-                isExported: methodRecord.get('isExported') || false,
-                visibility: methodRecord.get('visibility') || 'public' as const,
-                dependencies: [],
-                calls: []
-              };
-            });
-            
-            combinedAnalysis.classes.push({
-              id: classId,
-              name: entity.name,
-              methods: methods,
-              properties: [],
-              extends: undefined,
-              implements: [],
-              startLine: entity.startLine || 1,
-              endLine: entity.endLine || 1,
-              filePath: filePath,
-              isExported: entity.isExported || false,
-              visibility: entity.visibility || 'public' as const,
-              isAbstract: false
-            });
-          }
-          
-          if (entity.type === 'Method' || entity.type === 'Function') {
-            totalMethods++;
-            totalComplexity += entity.complexity || 1;
-            
+
+        // Combine functions from this file
+        if (fileAnalysis.functions) {
+          for (const func of fileAnalysis.functions) {
             combinedAnalysis.functions.push({
-              id: `func_${entity.name}_${entity.id}`,
-              name: entity.name,
-              parameters: JSON.parse(entity.parameters || '[]'),
-              returnType: entity.returnType || 'void',
-              complexity: entity.complexity || 1,
-              startLine: entity.startLine || 1,
-              endLine: entity.endLine || 1,
-              filePath: filePath,
-              isAsync: false,
-              isExported: entity.isExported || false,
-              visibility: entity.visibility || 'public' as const,
-              dependencies: [],
-              calls: []
+              ...func,
+              filePath: file.filePath, // Ensure file path is set
+              id: `${func.name}_${file.filePath.replace(/[^a-zA-Z0-9]/g, '_')}`
+            });
+            totalMethods++;
+          }
+        }
+
+        // Combine complexity
+        if (fileAnalysis.complexity) {
+          totalComplexity += fileAnalysis.complexity.cyclomaticComplexity || 0;
+          totalLines += fileAnalysis.complexity.linesOfCode || 0;
+        }
+
+        // Combine dependencies
+        if (fileAnalysis.dependencies) {
+          allDependencies.push(...fileAnalysis.dependencies);
+        }
+
+        // Combine imports
+        if (fileAnalysis.imports) {
+          for (const imp of fileAnalysis.imports) {
+            allImports.push(imp.source);
+            combinedAnalysis.imports.push({
+              ...imp,
+              filePath: file.filePath
             });
           }
         }
-      }
-      
-      // Query for dependencies and imports with simple string matching
-      const dependencyQuery = `
-        MATCH (f:File)-[:IMPORTS]->(dep)
-        WHERE f.filePath CONTAINS '${moduleDir}'
-           OR f.filePath CONTAINS './${moduleDir}'
-           OR f.filePath CONTAINS '/${moduleDir}'
-           OR f.filePath CONTAINS '${fullModuleDir}'
-        RETURN collect(DISTINCT dep.name) as dependencies
-      `;
-      
-      const depResult = await session.run(dependencyQuery);
-      if (depResult.records.length > 0) {
-        const deps = depResult.records[0].get('dependencies') || [];
-        combinedAnalysis.dependencies = deps;
-        
-        // Create import declarations
-        for (const dep of deps) {
-          combinedAnalysis.imports.push({
-            id: `import_${dep}_${Math.random().toString(36).substr(2, 9)}`,
-            source: dep,
-            imports: [],
-            filePath: moduleDir,
-            startLine: 1,
-            endLine: 1
-          });
-        }
-      }
-      
-      // Update complexity metrics
-      combinedAnalysis.complexity.cyclomaticComplexity = totalComplexity;
-      combinedAnalysis.complexity.linesOfCode = totalLines;
-      combinedAnalysis.complexity.maintainabilityIndex = Math.max(20, 100 - (totalComplexity / totalMethods || 1) * 10);
-      
-      await session.close();
-      await neo4jService.disconnect();
-      
-      logger.info('✅ Module analysis created with concrete Neo4j data', {
-        moduleDir,
-        filesCount: files.length,
-        classesCount: totalClasses,
-        methodsCount: totalMethods,
-        dependenciesCount: combinedAnalysis.dependencies.length,
-        totalComplexity,
-        totalLines
-      });
-      
-    } catch (error) {
-      logger.warn('⚠️ Failed to query Neo4j for concrete data, falling back to file-based analysis', { error });
-      
-      // Fallback to the original approach if Neo4j is not available
-      for (const file of files) {
-        const concrete = concreteInfo.get(file.filePath);
-        if (concrete) {
-          // Use the concrete information from the map
-          for (const className of concrete.actualClassNames) {
-            const classId = `class_${className}_${Math.random().toString(36).substr(2, 9)}`;
-            combinedAnalysis.classes.push({
-              id: classId,
-              name: className,
-              methods: [],
-              properties: [],
-              extends: undefined,
-              implements: [],
-              startLine: 1,
-              endLine: 1,
-              filePath: file.filePath,
-              isExported: concrete.actualExports.includes(className),
-              visibility: 'public' as const,
-              isAbstract: false
+
+        // Combine exports
+        if (fileAnalysis.exports) {
+          for (const exp of fileAnalysis.exports) {
+            allExports.push(exp.name);
+            combinedAnalysis.exports.push({
+              ...exp,
+              filePath: file.filePath
             });
           }
-          
-          combinedAnalysis.dependencies.push(...concrete.actualDependencies);
-          combinedAnalysis.complexity.cyclomaticComplexity += concrete.qualityMetrics.complexity;
+        }
+
+        // Combine errors
+        if (fileAnalysis.errors) {
+          combinedAnalysis.errors.push(...fileAnalysis.errors);
         }
       }
     }
+
+    // Set combined dependencies (unique)
+    combinedAnalysis.dependencies = Array.from(new Set(allDependencies));
+
+    // Update complexity metrics
+    combinedAnalysis.complexity.cyclomaticComplexity = totalComplexity;
+    combinedAnalysis.complexity.linesOfCode = totalLines;
+    combinedAnalysis.complexity.maintainabilityIndex = Math.max(20, 100 - (totalComplexity / Math.max(totalMethods, 1)) * 10);
+
+    logger.info('✅ Comprehensive module analysis created', {
+      moduleDir: fullModuleDir,
+      filesCount: files.length,
+      classesCount: combinedAnalysis.classes.length,
+      functionsCount: combinedAnalysis.functions.length,
+      totalMethodsCount: totalMethods,
+      dependenciesCount: combinedAnalysis.dependencies.length,
+      importsCount: combinedAnalysis.imports.length,
+      exportsCount: combinedAnalysis.exports.length,
+      totalComplexity,
+      totalLines,
+      classNames: combinedAnalysis.classes.map(cls => cls.name)
+    });
     
     return combinedAnalysis;
   }
@@ -1173,9 +957,141 @@ export class AutoAnalysisWorkflow extends EventEmitter {
       await neo4jService.connect(config);
       const analyzer = new MultiLanguageCodeGraphAnalyzer(neo4jService);
       
-      // Analyze the entire project with multi-language support
-      logger.info('🚀 Starting multi-language codebase analysis...');
+      // Analyze the entire project with multi-language support and progress tracking
+      logger.info('🚀 Starting multi-language codebase analysis with progress tracking...');
+      
+      // Get file count first for progress tracking
+      const { glob } = await import('glob');
+      const sourceFiles = await glob(`${this.config.projectRoot}/**/*.{ts,js,py,java,kt,scala,swift,go,rs,cpp,c,php,rb,cs,fs,vb,dart,lua,perl,sh,bash,zsh,fish,ps1,bat,cmd,r,R,matlab,m,sol,move,cairo,vy,clarity,scilla}`, {
+        ignore: [
+          // Package managers and dependencies
+          '**/node_modules/**',
+          '**/bower_components/**',
+          '**/vendor/**',
+          '**/packages/**',
+          '**/deps/**',
+          '**/.pnpm-store/**',
+          '**/.yarn/**',
+          
+          // Build outputs and artifacts
+          '**/dist/**',
+          '**/build/**',
+          '**/out/**',
+          '**/bin/**',
+          '**/obj/**',
+          '**/target/**',
+          '**/release/**',
+          '**/debug/**',
+          '**/__pycache__/**',
+          '**/*.pyc',
+          '**/.pytest_cache/**',
+          '**/coverage/**',
+          '**/.nyc_output/**',
+          '**/public/**',
+          '**/static/**',
+          
+          // IDE and editor files
+          '**/.vscode/**',
+          '**/.idea/**',
+          '**/.vs/**',
+          '**/*.swp',
+          '**/*.swo',
+          '**/*~',
+          
+          // Version control
+          '**/.git/**',
+          '**/.svn/**',
+          '**/.hg/**',
+          '**/.bzr/**',
+          
+          // OS specific
+          '**/.DS_Store',
+          '**/Thumbs.db',
+          '**/desktop.ini',
+          
+          // Language specific build artifacts
+          '**/*.class',         // Java
+          '**/*.jar',           // Java
+          '**/*.war',           // Java
+          '**/*.ear',           // Java
+          '**/.gradle/**',      // Gradle
+          '**/gradle/**',       // Gradle
+          '**/gradlew*',        // Gradle
+          '**/*.iml',           // IntelliJ
+          '**/cmake-build-*/**', // CMake
+          '**/.cmake/**',       // CMake
+          '**/CMakeFiles/**',   // CMake
+          '**/*.o',             // C/C++
+          '**/*.so',            // C/C++
+          '**/*.dll',           // Windows
+          '**/*.exe',           // Windows
+          '**/*.app',           // macOS
+          '**/*.dSYM/**',       // macOS debugging
+          '**/Cargo.lock',      // Rust (keep Cargo.toml)
+          '**/Pipfile.lock',    // Python (keep Pipfile)
+          '**/poetry.lock',     // Python (keep pyproject.toml)
+          '**/.tox/**',         // Python
+          '**/.venv/**',        // Python
+          '**/venv/**',         // Python
+          '**/env/**',          // Python
+          '**/site-packages/**', // Python
+          '**/go.sum',          // Go (keep go.mod)
+          '**/composer.lock',   // PHP (keep composer.json)
+          '**/yarn.lock',       // Node (keep package.json)
+          '**/package-lock.json', // Node (keep package.json)
+          '**/Gemfile.lock',    // Ruby (keep Gemfile)
+          
+          // AASWE knowledge directories
+          '**/knowledge/**',    // Skip TTL knowledge directories
+          '**/ttl/**',          // Skip TTL directories
+          '**/.aaswe/**',       // Skip AASWE metadata
+          
+          // Temporary and cache files
+          '**/tmp/**',
+          '**/temp/**',
+          '**/.cache/**',
+          '**/logs/**',
+          '**/*.log',
+          
+          // Documentation that's usually generated
+          '**/docs/build/**',
+          '**/site/**',
+          '**/_site/**',
+          
+          // Test output directories
+          '**/test-results/**',
+          '**/allure-results/**',
+          '**/cypress/videos/**',
+          '**/cypress/screenshots/**'
+        ]
+      });
+      
+      const totalFiles = sourceFiles.length;
+      logger.info(`🔍 Discovered ${totalFiles} source files to analyze`);
+      
+      // Show progress updates during analysis
+      const startTime = Date.now();
+      let progressInterval: NodeJS.Timeout | null = null;
+      
+      if (totalFiles > 50) {
+        // For large codebases, show periodic progress updates
+        progressInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const elapsedSeconds = Math.round(elapsed / 1000);
+          logger.info(`⏳ Analysis in progress... (${elapsedSeconds}s elapsed, processing ${totalFiles} files)`);
+        }, 10000); // Update every 10 seconds
+      }
+      
+      // Run the actual analysis
       const analysisResult = await analyzer.analyzeMultiLanguageCodebase(this.config.projectRoot);
+      
+      // Clear progress interval and show completion
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      logger.info(`✅ Source code analysis completed: ${totalFiles} files processed in ${totalTime}s`);
       
       totalNodes = analysisResult.entities.length;
       totalRelationships = analysisResult.relationships.length;
@@ -1615,6 +1531,134 @@ export class AutoAnalysisWorkflow extends EventEmitter {
     }
     
     return indicators;
+  }
+
+  /**
+   * Aggregate TTL files from all modules to the output directory
+   * This creates comprehensive TTL files that include ALL files in each module
+   */
+  private async aggregateTTLFilesToOutputDirectory(analysisResult: ProjectAnalysisResult): Promise<Map<string, any>> {
+    const ttlResults = new Map<string, any>();
+    
+    logger.info('🔄 Aggregating and combining TTL files to output directory', {
+      outputDirectory: this.config.outputDirectory,
+      totalFiles: analysisResult.files.length
+    });
+
+    try {
+      // Ensure output directory exists
+      await fs.mkdir(this.config.outputDirectory, { recursive: true });
+
+      // Group files by module/directory for comprehensive TTL generation
+      const moduleGroups = this.groupFilesByModule(analysisResult.files);
+      
+      logger.info('📁 Found modules to aggregate', {
+        moduleCount: moduleGroups.size,
+        modules: Array.from(moduleGroups.keys()).slice(0, 5) // Show first 5 modules
+      });
+
+      let aggregatedCount = 0;
+      let totalSize = 0;
+
+      // Generate comprehensive TTL for each module
+      for (const [moduleTTLPath, moduleFiles] of moduleGroups) {
+        try {
+          logger.info('🔄 Creating comprehensive TTL for module', {
+            modulePath: moduleTTLPath,
+            filesInModule: moduleFiles.length,
+            fileNames: moduleFiles.map(f => path.basename(f.filePath))
+          });
+
+          // ALWAYS generate comprehensive module analysis instead of copying existing files
+          // Create concrete information for ALL files in the module
+          const concreteInformation = new Map<string, ConcreteInformation>();
+          for (const file of moduleFiles) {
+            if (file.status === 'success' && file.analysisResult) {
+              const concrete = await this.buildConcreteInformation(file.analysisResult);
+              concreteInformation.set(file.filePath, concrete);
+              
+              logger.debug('📝 Added file to comprehensive analysis', {
+                filePath: file.filePath,
+                classes: concrete.actualClassNames,
+                methods: concrete.actualMethodSignatures.length
+              });
+            }
+          }
+          
+          // Generate comprehensive module analysis that includes ALL files
+          const moduleAnalysis = await this.createModuleAnalysis(moduleFiles, concreteInformation);
+          
+          // Generate comprehensive TTL content using RDF service
+          const rdfResult = await this.rdfService.generateRDF(moduleAnalysis, moduleTTLPath);
+          const ttlContent = rdfResult.rdfContent;
+          const ttlSize = ttlContent.length;
+          
+          logger.info('✅ Generated comprehensive TTL', {
+            path: moduleTTLPath,
+            size: ttlSize,
+            filesInModule: moduleFiles.length,
+            classesCount: moduleAnalysis.classes.length,
+            functionsCount: moduleAnalysis.functions.length,
+            methodsCount: moduleAnalysis.classes.reduce((sum, cls) => sum + cls.methods.length, 0),
+            classNames: moduleAnalysis.classes.map(cls => cls.name)
+          });
+          
+          // Generate output file name based on the module directory
+          const moduleDir = path.dirname(moduleTTLPath);
+          const relativePath = path.relative(this.config.projectRoot, moduleDir);
+          const moduleDirName = relativePath.replace(/[/\\]/g, '_'); // Replace path separators with underscores
+          const outputFileName = `${moduleDirName}.module-knowledge.ttl`;
+          const outputPath = path.join(this.config.outputDirectory, outputFileName);
+
+          // Write comprehensive TTL to output directory
+          await fs.writeFile(outputPath, ttlContent, 'utf8');
+
+          // Store in results map
+          ttlResults.set(moduleTTLPath, {
+            rdfContent: ttlContent,
+            size: ttlSize,
+            originalPath: moduleTTLPath,
+            outputPath: outputPath,
+            moduleDir: moduleDir,
+            filesInModule: moduleFiles.length
+          });
+
+          aggregatedCount++;
+          totalSize += ttlSize;
+
+          logger.debug('✅ Aggregated comprehensive TTL file', {
+            originalPath: moduleTTLPath,
+            outputPath: outputPath,
+            moduleDir: moduleDir,
+            size: ttlSize,
+            filesInModule: moduleFiles.length
+          });
+
+        } catch (error) {
+          logger.error('❌ Failed to aggregate TTL for module', {
+            modulePath: moduleTTLPath,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      logger.info('✅ TTL files aggregated successfully', {
+        aggregatedCount,
+        totalSize,
+        outputDirectory: this.config.outputDirectory,
+        averageSize: aggregatedCount > 0 ? Math.round(totalSize / aggregatedCount) : 0,
+        averageFilesPerModule: aggregatedCount > 0 ? Math.round(analysisResult.files.length / aggregatedCount) : 0
+      });
+
+    } catch (error) {
+      logger.error('❌ Failed to aggregate TTL files', {
+        error: error instanceof Error ? error.message : String(error),
+        outputDirectory: this.config.outputDirectory
+      });
+      throw error;
+    }
+
+    return ttlResults;
   }
 
 }

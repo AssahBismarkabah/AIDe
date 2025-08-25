@@ -584,23 +584,157 @@ export class MCPStdioServer extends EventEmitter {
       });
     }
     
-    // Add project files as resources
+    // Add target project source files as a comprehensive codebase index
+    // This creates the "augmented code context engine": TTL + Neo4j + Source Code
     try {
-      const projectFiles = await glob('src/**/*.{ts,js,py,java}', {
-        ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-        absolute: true
-      });
+      const directories = this.config.ttl.directories || [];
+      const projectFiles: string[] = [];
       
-      for (const filePath of projectFiles.slice(0, 100)) { // Limit to prevent overwhelming
+      for (const ttlDirectory of directories) {
+        // Infer the target project root from TTL directory structure
+        // Example: "./keycloak-config-cli/knowledge" -> "./keycloak-config-cli"
+        const projectRoot = ttlDirectory.replace(/\/knowledge\s*$/, '').replace(/\/ttl\s*$/, '');
+        
+        // Only scan the actual target project directory (not the TTL directory or AASWE tool)
+        if (projectRoot &&
+            projectRoot !== ttlDirectory &&
+            projectRoot !== '.' &&
+            projectRoot !== './' &&
+            !projectRoot.includes('AIDe')) {
+          
+          logger.debug('Scanning target project for source code index', {
+            ttlDirectory,
+            projectRoot
+          });
+          
+          const files = await glob(`${projectRoot}/**/*.{ts,js,py,java,kt,scala,swift,go,rs,cpp,c,php,rb,cs,fs,vb,dart,lua,perl,sh,bash,zsh,fish,ps1,bat,cmd,r,R,matlab,m,sol,move,cairo,vy,clarity,scilla}`, {
+            ignore: [
+              // Package managers and dependencies
+              '**/node_modules/**',
+              '**/bower_components/**',
+              '**/vendor/**',
+              '**/packages/**',
+              '**/deps/**',
+              '**/.pnpm-store/**',
+              '**/.yarn/**',
+              
+              // Build outputs and artifacts
+              '**/dist/**',
+              '**/build/**',
+              '**/out/**',
+              '**/bin/**',
+              '**/obj/**',
+              '**/target/**',
+              '**/release/**',
+              '**/debug/**',
+              '**/__pycache__/**',
+              '**/*.pyc',
+              '**/.pytest_cache/**',
+              '**/coverage/**',
+              '**/.nyc_output/**',
+              '**/public/**',
+              '**/static/**',
+              
+              // IDE and editor files
+              '**/.vscode/**',
+              '**/.idea/**',
+              '**/.vs/**',
+              '**/*.swp',
+              '**/*.swo',
+              '**/*~',
+              
+              // Version control
+              '**/.git/**',
+              '**/.svn/**',
+              '**/.hg/**',
+              '**/.bzr/**',
+              
+              // OS specific
+              '**/.DS_Store',
+              '**/Thumbs.db',
+              '**/desktop.ini',
+              
+              // Language specific build artifacts
+              '**/*.class',         // Java
+              '**/*.jar',           // Java
+              '**/*.war',           // Java
+              '**/*.ear',           // Java
+              '**/.gradle/**',      // Gradle
+              '**/gradle/**',       // Gradle
+              '**/gradlew*',        // Gradle
+              '**/*.iml',           // IntelliJ
+              '**/cmake-build-*/**', // CMake
+              '**/.cmake/**',       // CMake
+              '**/CMakeFiles/**',   // CMake
+              '**/*.o',             // C/C++
+              '**/*.so',            // C/C++
+              '**/*.dll',           // Windows
+              '**/*.exe',           // Windows
+              '**/*.app',           // macOS
+              '**/*.dSYM/**',       // macOS debugging
+              '**/Cargo.lock',      // Rust (keep Cargo.toml)
+              '**/Pipfile.lock',    // Python (keep Pipfile)
+              '**/poetry.lock',     // Python (keep pyproject.toml)
+              '**/.tox/**',         // Python
+              '**/.venv/**',        // Python
+              '**/venv/**',         // Python
+              '**/env/**',          // Python
+              '**/site-packages/**', // Python
+              '**/go.sum',          // Go (keep go.mod)
+              '**/composer.lock',   // PHP (keep composer.json)
+              '**/yarn.lock',       // Node (keep package.json)
+              '**/package-lock.json', // Node (keep package.json)
+              '**/Gemfile.lock',    // Ruby (keep Gemfile)
+              
+              // AASWE knowledge directories
+              '**/knowledge/**',    // Skip TTL knowledge directories
+              '**/ttl/**',          // Skip TTL directories
+              '**/.aaswe/**',       // Skip AASWE metadata
+              
+              // Temporary and cache files
+              '**/tmp/**',
+              '**/temp/**',
+              '**/.cache/**',
+              '**/logs/**',
+              '**/*.log',
+              
+              // Documentation that's usually generated
+              '**/docs/build/**',
+              '**/site/**',
+              '**/_site/**',
+              
+              // Test output directories
+              '**/test-results/**',
+              '**/allure-results/**',
+              '**/cypress/videos/**',
+              '**/cypress/screenshots/**'
+            ],
+            absolute: true
+          });
+          
+          projectFiles.push(...files);
+        }
+      }
+      
+      // Add source files as resources (codebase index)
+      for (const filePath of projectFiles.slice(0, 200)) { // Allow more files for comprehensive index
         resources.push({
           uri: `file://${filePath}`,
-          name: `File: ${relative(process.cwd(), filePath)}`,
-          description: `Source file`,
+          name: `Source: ${relative(process.cwd(), filePath)}`,
+          description: `Target project source file`,
           mimeType: this.getMimeType(filePath)
         });
       }
+      
+      logger.debug('Added target project source files to augmented context engine', {
+        ttlFiles: this.ttlContextLoader.getTTLFiles().size,
+        sourceFiles: projectFiles.length,
+        ttlDirectories: directories,
+        totalResources: resources.length
+      });
+      
     } catch (error) {
-      logger.warn('Failed to list project files as resources', { error });
+      logger.warn('Failed to build source code index for augmented context engine', { error });
     }
 
     return { resources };

@@ -68,7 +68,13 @@ export class ModuleKnowledgeManager extends EventEmitter {
       ...options
     };
 
-    this.rdfService = new RDFService();
+    // CRITICAL FIX: Create RDFService with proper configuration to prevent business context placeholders
+    this.rdfService = new RDFService(this.options.rdfGenerationOptions || {
+      includeBusinessContext: false,
+      generatePlaceholders: false, // CRITICAL: Prevent mock "E-commerce" placeholders
+      optimizeForLLM: true,
+      optimizeForNeo4j: true
+    });
     this.rdfValidator = new RDFValidator();
     this.backupDirectory = path.join(process.cwd(), '.aaswe', 'backups');
     this.mcpContextCache = new Map();
@@ -184,6 +190,18 @@ export class ModuleKnowledgeManager extends EventEmitter {
   ): Promise<ModuleKnowledgeResult<ModuleKnowledgeFile>> {
     try {
       const knowledgeFilePath = this.getKnowledgeFilePath(sourceFilePath);
+      
+      // DEBUG: Log the AST result data received
+      console.log('🔍 DEBUG ModuleKnowledgeManager.updateKnowledgeFileFromCode:');
+      console.log('  sourceFilePath:', sourceFilePath);
+      console.log('  astResult keys:', Object.keys(astResult || {}));
+      console.log('  astResult.classes:', astResult?.classes?.length || 0, 'classes');
+      console.log('  astResult.functions:', astResult?.functions?.length || 0, 'functions');
+      
+      if (astResult?.classes?.length > 0) {
+        console.log('  First class:', astResult.classes[0]);
+        console.log('  First class methods:', astResult.classes[0]?.methods?.length || 0);
+      }
       
       logger.info('Updating knowledge file from code changes', {
         sourceFile: sourceFilePath,

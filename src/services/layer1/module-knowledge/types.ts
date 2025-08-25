@@ -105,6 +105,13 @@ export interface ModuleKnowledgeManagerOptions {
   validationLevel: 'strict' | 'moderate' | 'lenient';
   backupEnabled: boolean;
   backupRetention: number; // days
+  // CRITICAL FIX: Add RDF generation options
+  rdfGenerationOptions?: {
+    includeBusinessContext?: boolean;
+    generatePlaceholders?: boolean;
+    optimizeForLLM?: boolean;
+    optimizeForNeo4j?: boolean;
+  };
 }
 
 export interface KnowledgeGraphUpdate {

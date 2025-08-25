@@ -19,6 +19,7 @@ import { Layer3AIService } from '../services/layer3';
 import { HybridStorageManager } from '../services/layer2/hybrid-storage/HybridStorageManager';
 import { InMemoryRDFStore } from '../services/layer2/in-memory-rdf';
 import { Neo4jDatabaseService } from '../services/layer2/neo4j-database';
+import { MemoryScalingService } from '../services/infrastructure/MemoryScalingService';
 
 // Load environment variables from .env.aaswe
 config({ path: '.env.aaswe' });
@@ -200,22 +201,24 @@ program
   });
 
 /**
- * Full-start command - Start complete system with all containers
+ * Full-start command - Start complete system with all containers + auto-analysis
  */
 program
   .command('full-start')
-  .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis)')
+  .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis) and auto-analyze project')
   .option('--project-path <path>', 'Custom project path for analysis (not docker-compose location)', process.cwd())
   .option('--detach', 'Run containers in background')
   .option('--build', 'Rebuild containers before starting')
+  .option('--skip-analysis', 'Skip automatic project analysis')
   .action(async (options) => {
     try {
-      // The project path is for analysis, but docker-compose should run from AASWE package directory
-      const analysisProjectPath = options.projectPath || process.cwd();
-      
       // Find the AASWE package directory (where docker-compose.yml is located)
       const path = require('path');
       const fs = require('fs');
+      
+      // The project path is for analysis, but docker-compose should run from AASWE package directory
+      // CRITICAL FIX: Resolve relative path to absolute path for proper scope restriction
+      const analysisProjectPath = path.resolve(options.projectPath || process.cwd());
       
       // Prefer local docker-compose.yml if it exists, otherwise use NPM package version
       let packageRoot = process.cwd();
@@ -237,12 +240,12 @@ program
       }
       
       logger.info('🚀 Starting Complete AASWE System with All Containers...');
-      logger.info('📦 This includes: Neo4j Database + MCP Server + Redis Cache');
+      logger.info('📦 This includes: Neo4j Database + Redis Cache + Auto-Analysis + MCP Server');
       logger.info(`🎯 Analysis will target: ${analysisProjectPath}`);
       logger.info(`🐳 Using docker-compose from: ${packageRoot}`);
       
       // Check if Docker is available
-      const { spawn } = require('child_process');
+      const { spawn, execSync } = require('child_process');
       
       // Check Docker availability
       const dockerCheck = spawn('docker', ['--version'], { stdio: 'pipe' });
@@ -262,47 +265,167 @@ program
         // Docker is available, proceed with startup
         logger.info('✅ Docker detected - proceeding with container startup');
         
-        // Build Docker Compose arguments
-        const args = ['compose', 'up'];
-        if (options.detach) args.push('-d');
-        if (options.build) args.push('--build');
+        // Phase 0: Auto-detect codebase size and configure Neo4j memory
+        logger.info('🧠 Phase 0: Auto-configuring Neo4j memory for codebase size...');
+        
+        try {
+          const memoryConfig = await MemoryScalingService.detectOptimalMemoryConfiguration(analysisProjectPath);
+          logger.info('📊 Detected codebase characteristics:', {
+            estimatedFiles: memoryConfig.estimatedFiles,
+            recommendedHeapSize: memoryConfig.heapSize,
+            recommendedPageCacheSize: memoryConfig.pageCacheSize,
+            category: memoryConfig.estimatedFiles < 1000 ? 'Small' :
+                     memoryConfig.estimatedFiles < 5000 ? 'Medium' :
+                     memoryConfig.estimatedFiles < 20000 ? 'Large' : 'Very Large'
+          });
+          
+          MemoryScalingService.setMemoryEnvironmentVariables(memoryConfig);
+          logger.info('✅ Neo4j memory configuration applied automatically');
+          
+          // Validate system memory if possible
+          const systemValidation = MemoryScalingService.validateSystemMemory(memoryConfig);
+          if (!systemValidation) {
+            logger.warn('⚠️  Consider upgrading system memory for optimal performance');
+          }
+          
+          // Show scaling recommendations for large codebases
+          const recommendations = MemoryScalingService.getScalingRecommendations(memoryConfig.estimatedFiles);
+          if (recommendations.length > 0) {
+            logger.info('💡 Scaling recommendations for large codebase:');
+            recommendations.forEach(rec => logger.info(`   - ${rec}`));
+          }
+          
+        } catch (error) {
+          logger.warn('⚠️  Unable to auto-configure memory, using defaults', { error: error instanceof Error ? error.message : error });
+        }
+        
+        // Phase 1: Start Neo4j and Redis containers only (not MCP server yet)
+        logger.info('🐳 Phase 1: Starting infrastructure containers...');
+        logger.info('📊 Starting:');
+        logger.info('   - Neo4j Database (Graph storage)');
+        logger.info('   - Redis Cache (Performance optimization)');
+        
+        const infraArgs = ['compose', 'up', '-d', 'neo4j', 'redis'];
+        if (options.build) infraArgs.push('--build');
         
         // Set environment variable for the analysis project path
         const env = { ...process.env, ANALYSIS_PROJECT_PATH: analysisProjectPath };
         
-        logger.info('🐳 Starting all AASWE containers...');
-        logger.info('📊 Services starting:');
-        logger.info('   - Neo4j Database (Graph storage with source code)');
-        logger.info('   - Redis Cache (Performance optimization)');
-        logger.info('   - AASWE MCP Server (LLM integration)');
-        
-        const child = spawn('docker', args, {
+        const infraChild = spawn('docker', infraArgs, {
           stdio: 'inherit',
-          cwd: packageRoot, // Use AASWE package root, not current directory
+          cwd: packageRoot,
           env: env
         });
         
-        child.on('close', (code) => {
-          if (code === 0) {
-            logger.info('');
-            logger.info('🎉 Complete AASWE System Started Successfully!');
-            logger.info('');
-            logger.info('🔗 Access Points:');
-            logger.info('   📡 MCP Server: ws://localhost:3001 (for IDE integration)');
-            logger.info('   🗄️  Neo4j Browser: http://localhost:7474 (neo4j/aaswe-password)');
-            logger.info('   ⚡ Redis Cache: localhost:6379');
-            logger.info('');
-            logger.info('🎯 Next Steps:');
-            logger.info('   1. Configure your IDE to connect to: ws://localhost:3001');
-            logger.info('   2. Run: codebase-ai analyze (to populate the knowledge graph)');
-            logger.info('   3. Visit http://localhost:7474 to explore the Neo4j graph database');
-            logger.info('');
-            logger.info('💡 To stop all services: codebase-ai docker down');
-          } else {
-            logger.error('❌ Failed to start complete AASWE system');
-            logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
-            process.exit(code);
+        infraChild.on('close', async (infraCode) => {
+          if (infraCode !== 0) {
+            logger.error('❌ Failed to start infrastructure containers');
+            process.exit(infraCode);
           }
+          
+          logger.info('✅ Infrastructure containers started successfully');
+          
+          // Phase 2: Wait for Neo4j to be ready
+          logger.info('🕐 Phase 2: Waiting for Neo4j to be ready...');
+          let neo4jReady = false;
+          let retries = 30; // 30 seconds timeout
+          
+          while (!neo4jReady && retries > 0) {
+            try {
+              execSync('docker exec aide-neo4j-1 cypher-shell -u neo4j -p aaswe-password "RETURN 1"', { stdio: 'pipe' });
+              neo4jReady = true;
+              logger.info('✅ Neo4j is ready and accepting connections');
+            } catch (error) {
+              retries--;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              if (retries % 5 === 0) {
+                logger.info(`⏳ Still waiting for Neo4j... (${retries}s remaining)`);
+              }
+            }
+          }
+          
+          if (!neo4jReady) {
+            logger.error('❌ Neo4j failed to start within timeout');
+            logger.info('💡 Try: docker compose down && codebase-ai full-start --build');
+            process.exit(1);
+          }
+          
+          // Phase 3: Run automatic analysis
+          if (!options.skipAnalysis) {
+            logger.info('🔍 Phase 3: Running automatic project analysis...');
+            logger.info(`📁 Analyzing project: ${analysisProjectPath}`);
+            
+            try {
+              const outputDir = path.join(analysisProjectPath, 'knowledge');
+              await mkdir(outputDir, { recursive: true });
+
+              // Import and run the AutoAnalysisWorkflow
+              const { AutoAnalysisWorkflow } = await import('../services/project-analysis/AutoAnalysisWorkflow');
+              
+              const workflow = new AutoAnalysisWorkflow({
+                projectRoot: analysisProjectPath,
+                outputDirectory: outputDir,
+                languages: ['typescript', 'javascript', 'python', 'java'],
+                preserveBusinessContext: false, // CRITICAL FIX: Disable to prevent mock placeholder override
+                enableBusinessContextPlaceholders: false, // CRITICAL FIX: Disable mock placeholders
+                enableKnowledgeGraphPopulation: true, // Enable Neo4j population
+                enableMCPContextLoading: false // CLI mode doesn't need MCP server yet
+              });
+
+              logger.info('🚀 Running comprehensive analysis workflow...');
+              const result = await workflow.executeComprehensiveAnalysis();
+
+              logger.info('✅ Project analysis completed successfully!', {
+                filesAnalyzed: result.summary.analyzedFiles,
+                ttlFilesGenerated: result.summary.ttlFilesGenerated,
+                executionTime: `${result.duration}ms`
+              });
+              
+              logger.info(`📁 TTL knowledge files generated in: ${outputDir}`);
+              
+            } catch (error) {
+              logger.warn('⚠️ Analysis failed but continuing with MCP server startup', { error: error instanceof Error ? error.message : error });
+              logger.info('💡 You can run analysis later with: codebase-ai analyze');
+            }
+          } else {
+            logger.info('⏭️ Phase 3: Skipping analysis (--skip-analysis flag used)');
+          }
+          
+          // Phase 4: Start MCP Server
+          logger.info('🌐 Phase 4: Starting MCP Server...');
+          logger.info('📡 MCP Server will load generated TTL files');
+          
+          const mcpArgs = ['compose', 'up', '-d', 'aaswe-server'];
+          if (options.build) mcpArgs.push('--build');
+          
+          const mcpChild = spawn('docker', mcpArgs, {
+            stdio: 'inherit',
+            cwd: packageRoot,
+            env: env
+          });
+          
+          mcpChild.on('close', (mcpCode) => {
+            if (mcpCode === 0) {
+              logger.info('');
+              logger.info('🎉 Complete AASWE System Started Successfully!');
+              logger.info('');
+              logger.info('🔗 Access Points:');
+              logger.info('   📡 MCP Server: ws://localhost:3001 (for IDE integration)');
+              logger.info('   🗄️  Neo4j Browser: http://localhost:7474 (neo4j/aaswe-password)');
+              logger.info('   ⚡ Redis Cache: localhost:6379');
+              logger.info('');
+              logger.info('🎯 System Ready:');
+              logger.info('   ✅ Infrastructure: Neo4j + Redis running');
+              logger.info(`   ✅ Analysis: ${options.skipAnalysis ? 'Skipped' : 'Completed'}`);
+              logger.info('   ✅ MCP Server: Ready for IDE integration');
+              logger.info('');
+              logger.info('💡 To stop all services: codebase-ai docker down');
+            } else {
+              logger.error('❌ Failed to start MCP server');
+              logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
+              process.exit(mcpCode);
+            }
+          });
         });
       });
       
@@ -471,7 +594,8 @@ program
         projectRoot: process.cwd(),
         outputDirectory: outputDir,
         languages: options.languages.split(',').map((lang: string) => lang.trim()),
-        preserveBusinessContext: true,
+        preserveBusinessContext: false, // CRITICAL FIX: Disable to prevent mock placeholder override
+        enableBusinessContextPlaceholders: false, // CRITICAL FIX: Disable mock placeholders
         enableKnowledgeGraphPopulation: true, // Enable Neo4j if available
         enableMCPContextLoading: false // CLI mode doesn't need MCP server
       });

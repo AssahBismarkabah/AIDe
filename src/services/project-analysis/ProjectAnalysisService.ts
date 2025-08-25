@@ -30,6 +30,13 @@ export interface ProjectAnalysisConfig {
   enableWatching?: boolean;
   preserveBusinessContext?: boolean;
   analysisDepth?: 'basic' | 'detailed' | 'comprehensive';
+  // CRITICAL FIX: Add RDF generation options to interface
+  rdfGenerationOptions?: {
+    includeBusinessContext?: boolean;
+    generatePlaceholders?: boolean;
+    optimizeForLLM?: boolean;
+    optimizeForNeo4j?: boolean;
+  };
 }
 
 export interface ProjectAnalysisResult {
@@ -52,6 +59,7 @@ export interface ProjectAnalysisResult {
     status: 'success' | 'error' | 'skipped';
     ttlGenerated: boolean;
     error?: string;
+    analysisResult?: any; // Include concrete analysis data (classes, functions, imports)
   }>;
   errors: Array<{
     filePath: string;
@@ -145,7 +153,14 @@ export class ProjectAnalysisService extends EventEmitter {
       autoValidate: true,
       preserveBusinessContext: this.config.preserveBusinessContext || true,
       enableConflictResolution: true,
-      enableLLMPreview: true
+      enableLLMPreview: true,
+      // CRITICAL FIX: Pass RDF generation options to ModuleKnowledgeManager
+      rdfGenerationOptions: this.config.rdfGenerationOptions || {
+        includeBusinessContext: true,
+        generatePlaceholders: true,
+        optimizeForLLM: true,
+        optimizeForNeo4j: true
+      }
     });
 
     // Use TypeScript analyzer as primary for code ingestion
@@ -248,7 +263,8 @@ export class ProjectAnalysisService extends EventEmitter {
           language: result.language,
           status: result.success ? 'success' : 'error',
           ttlGenerated: result.ttlGenerated || false,
-          error: result.error
+          error: result.error,
+          analysisResult: result.analysisResult // Include concrete analysis data
         })),
         errors: analysisResults
           .filter(result => !result.success)
@@ -350,7 +366,8 @@ export class ProjectAnalysisService extends EventEmitter {
           language: result.language,
           status: result.success ? 'success' : 'error',
           ttlGenerated: result.ttlGenerated || false,
-          error: result.error
+          error: result.error,
+          analysisResult: result.analysisResult // Include concrete analysis data
         })),
         errors: analysisResults
           .filter(result => !result.success)
