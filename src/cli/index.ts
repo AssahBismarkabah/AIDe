@@ -220,20 +220,96 @@ program
       // CRITICAL FIX: Resolve relative path to absolute path for proper scope restriction
       const analysisProjectPath = path.resolve(options.projectPath || process.cwd());
       
-      // Prefer local docker-compose.yml if it exists, otherwise use NPM package version
+      // Strategy: Find docker-compose.yml in the following order:
+      // 1. Current working directory (for local development)
+      // 2. NPM package installation directory (for global installs)
+
       let packageRoot = process.cwd();
       let dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
-      
+
+      logger.info(`🔍 Looking for docker-compose.yml in current directory: ${dockerComposePath}`);
+
       if (!fs.existsSync(dockerComposePath)) {
+        logger.info('📦 Not found in current directory, searching NPM package location...');
+
         // Fall back to NPM package docker-compose.yml
-        const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
-        packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath))); // Go up from dist/cli to package root
-        dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
-        
-        // Verify docker-compose.yml exists in package
-        if (!fs.existsSync(dockerComposePath)) {
-          logger.error('❌ AASWE docker-compose.yml not found in package or current directory');
-          logger.error(`Expected at: ${dockerComposePath} or ${path.join(process.cwd(), 'docker-compose.yml')}`);
+        try {
+          // Try multiple methods to find the package root
+          let cliScriptPath: string;
+
+          // Method 1: Use __dirname (most reliable for global installs)
+          cliScriptPath = __dirname;
+          logger.info(`🔧 CLI script location (__dirname): ${cliScriptPath}`);
+
+          // Method 2: Try resolving the package (fallback)
+          if (!cliScriptPath || cliScriptPath === '/') {
+            try {
+              cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
+              logger.info(`🔧 Package resolved to: ${cliScriptPath}`);
+            } catch (e) {
+              logger.warn('⚠️  Could not resolve package via require.resolve');
+              // Method 3: Try relative to current file
+              cliScriptPath = path.join(__dirname, '..', '..', 'dist', 'cli', 'index.js');
+              logger.info(`🔧 Using relative path: ${cliScriptPath}`);
+            }
+          }
+
+          // Navigate up from dist/cli to package root
+          // If __dirname is like: /usr/local/lib/node_modules/@aaswe/codebase-ai/dist/cli
+          // We need to go up 2 levels: ../.. to get to package root
+          if (cliScriptPath.endsWith('/dist/cli')) {
+            packageRoot = path.dirname(path.dirname(cliScriptPath));
+          } else if (cliScriptPath.endsWith('/dist/cli/index.js')) {
+            packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath)));
+          } else {
+            // Fallback: assume we're in the package and go up appropriately
+            packageRoot = path.dirname(path.dirname(cliScriptPath));
+          }
+
+          dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+          logger.info(`🔍 Checking NPM package location: ${dockerComposePath}`);
+
+          logger.info(`🔍 Searching for docker-compose.yml at: ${dockerComposePath}`);
+
+          // Verify docker-compose.yml exists in package
+          if (!fs.existsSync(dockerComposePath)) {
+            // Try alternative locations for global installations
+            const alternativeLocations = [
+              // Try one level up (in case we're in a nested structure)
+              path.join(path.dirname(packageRoot), 'docker-compose.yml'),
+              // Try in the same directory as the CLI script
+              path.join(path.dirname(cliScriptPath), '..', '..', 'docker-compose.yml'),
+              // Try in node_modules global location
+              path.join(path.dirname(cliScriptPath), '..', '..', '..', 'docker-compose.yml')
+            ];
+
+            let found = false;
+            for (const altPath of alternativeLocations) {
+              if (fs.existsSync(altPath)) {
+                dockerComposePath = altPath;
+                packageRoot = path.dirname(altPath);
+                found = true;
+                logger.info(`✅ Found docker-compose.yml at: ${altPath}`);
+                break;
+              }
+            }
+
+            if (!found) {
+              logger.error('❌ AASWE docker-compose.yml not found in package or current directory');
+              logger.error(`Searched locations:`);
+              logger.error(`  - Current directory: ${path.join(process.cwd(), 'docker-compose.yml')}`);
+              logger.error(`  - Package directory: ${dockerComposePath}`);
+              logger.error(`  - CLI script path: ${cliScriptPath}`);
+              logger.error(`  - Package root: ${packageRoot}`);
+              alternativeLocations.forEach(loc => logger.error(`  - Alternative: ${loc}`));
+              logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
+              logger.info('💡 Or run from the AASWE project directory with local docker-compose.yml');
+              process.exit(1);
+            }
+          }
+        } catch (error) {
+          logger.error('❌ Failed to locate AASWE package installation');
+          logger.error('Error:', error instanceof Error ? error.message : error);
           logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
           process.exit(1);
         }
@@ -305,16 +381,25 @@ program
         logger.info('   - Neo4j Database (Graph storage)');
         logger.info('   - Redis Cache (Performance optimization)');
         
-        const infraArgs = ['compose', 'up', '-d', 'neo4j', 'redis'];
+        const infraArgs = ['compose', 'up', '-d'];
         if (options.build) infraArgs.push('--build');
+        infraArgs.push('neo4j', 'redis');
         
         // Set environment variable for the analysis project path
         const env = { ...process.env, ANALYSIS_PROJECT_PATH: analysisProjectPath };
         
+        logger.info(`🔧 Executing: docker ${infraArgs.join(' ')}`);
+        logger.info(`📁 Working directory: ${packageRoot}`);
+
         const infraChild = spawn('docker', infraArgs, {
           stdio: 'inherit',
           cwd: packageRoot,
           env: env
+        });
+
+        infraChild.on('error', (error) => {
+          logger.error('❌ Failed to execute docker command:', error);
+          process.exit(1);
         });
         
         infraChild.on('close', async (infraCode) => {

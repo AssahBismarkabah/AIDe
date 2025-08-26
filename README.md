@@ -98,7 +98,9 @@ node dist/cli/index.js full-start --build
 - **Node.js**: 20.0.0+
 - **Memory**: 2GB RAM
 - **Disk**: 1GB free space
-- **Docker**: 20.0.0+ (for full system)
+- **Docker**: 20.0.0+ with **Docker Compose V2** (for full system)
+  - Check with: `docker compose version`
+  - Should show: `Docker Compose version v2.x.x`
 
 ##  Installation & Setup
 
@@ -124,6 +126,33 @@ AASWE creates these files:
 - `aaswe.config.js` - Main configuration
 - `.env.aaswe` - Environment variables
 - `.aaswe/` - Analysis cache and knowledge files
+
+## ⚠️ Prerequisites for Full System Mode
+
+Before running `codebase-ai full-start --build`, ensure you have:
+
+### Docker Compose V2 Required
+```bash
+# Check if you have Docker Compose V2
+docker compose version
+
+# Should show: Docker Compose version v2.x.x
+# If you see "command not found" or v1.x.x, please upgrade
+```
+
+### Docker Engine Version
+```bash
+# Check Docker version (20.10+ recommended)
+docker --version
+```
+
+> **⚠️ Important**: The `full-start --build` command requires **Docker Compose V2** (command: `docker compose` with space). Docker Compose V1 (`docker-compose` with hyphen) cannot access the NPM package's docker-compose.yml file and will not work with the global installation.
+
+### Quick Compatibility Check
+```bash
+# This should work without errors:
+docker compose --help
+```
 
 ##  Usage
 
@@ -439,6 +468,28 @@ docker-compose restart neo4j
 # Start full system properly
 codebase-ai full-start --build
 ```
+
+#### "Docker Compose V1 Compatibility"
+```bash
+# Check your Docker Compose version
+docker compose version  # V2 (preferred)
+docker-compose --version  # V1 (legacy)
+
+# If you have V1 only, you have two options:
+
+# Option 1: Upgrade to Docker Compose V2 (RECOMMENDED)
+# Follow: https://docs.docker.com/compose/install/
+
+# Option 2: Clone the repository and use manual commands
+git clone https://github.com/AssahBismarkabah/AIDe.git
+cd AIDe
+docker-compose up -d --build neo4j redis
+# Then in another terminal (from your project directory):
+codebase-ai start --mode full
+```
+
+> **⚠️ Important**: The NPM package's docker-compose.yml is not accessible to `docker-compose` V1 commands. You must either upgrade to V2 or clone the repository to access the compose file.
+
 
 #### "MCP Server Connection Issues"
 ```bash
