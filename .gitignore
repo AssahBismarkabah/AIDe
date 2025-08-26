@@ -95,3 +95,4 @@ temp/
 # Test artifacts
 .jest/
 test-results/
+keycloak-config-cli/
