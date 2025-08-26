@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Get version from package.json
 VERSION=$(node -p "require('./package.json').version")
-IMAGE_NAME="aaswe/codebase-ai"
+IMAGE_NAME="assah/codebase-ai"
 
 echo -e "${BLUE}🐳 AASWE Docker Build and Publish Script${NC}"
 echo -e "${BLUE}================================================${NC}"
