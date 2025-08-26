@@ -8,7 +8,7 @@
 import { readFile, stat, access } from 'fs/promises';
 import { watch, FSWatcher } from 'chokidar';
 import { glob } from 'glob';
-import { dirname, relative } from 'path';
+import { dirname, relative, posix as pathPosix } from 'path';
 import { createHash } from 'crypto';
 import { EventEmitter } from 'events';
 import logger from '../../utils/logger';
@@ -343,11 +343,13 @@ export class TTLContextLoader extends EventEmitter {
       for (const directory of directories) {
         for (const pattern of patterns) {
           // Combine directory with pattern, avoiding double slashes
-          const searchPattern = directory === './' ? pattern : `${directory.replace(/\/$/, '')}/${pattern}`;
-          
+          const base = directory === './' ? '' : directory.replace(/[\\/]+$/, '');
+          const searchPattern = base ? pathPosix.join(base, pattern) : pattern;
+
           const files = await glob(searchPattern, {
             ignore: this.config.loadIgnored || ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
-            absolute: true
+            absolute: true,
+            windowsPathsNoEscape: true
           });
           ttlFiles.push(...files);
         }

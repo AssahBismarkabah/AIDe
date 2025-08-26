@@ -173,11 +173,8 @@ export class JavaAnalyzer extends BaseAnalyzer {
           calls: this.extractJavaMethodCalls(method)
         };
         
-        console.log(`DEBUG JavaAnalyzer: Extracted method "${func.name}" with complexity ${func.complexity}`);
         classMethods.push(func);
       }
-      
-      console.log(`DEBUG JavaAnalyzer: Class "${cls.name}" final method count: ${classMethods.length}`);
       
       const classObj: CodeClass = {
         id: this.generateId(),
@@ -319,8 +316,10 @@ export class JavaAnalyzer extends BaseAnalyzer {
       classes: []
     };
 
-    if (cst.children?.ordinaryCompilationUnit) {
-      const compilationUnit = cst.children.ordinaryCompilationUnit[0];
+    const compilationUnit =
+      cst.children?.ordinaryCompilationUnit?.[0] ??
+      cst.children?.compilationUnit?.[0];
+    if (compilationUnit) {
       
       // Extract package declaration
       if (compilationUnit.children?.packageDeclaration) {
@@ -492,7 +491,7 @@ export class JavaAnalyzer extends BaseAnalyzer {
       methodName = methodDeclarator.children.Identifier[0].image;
     }
     
-    console.log('DEBUG JavaAnalyzer: Extracted method name:', methodName);
+
     
     const returnType = this.extractType(methodDecl.children?.methodHeader?.[0]?.children?.result?.[0]);
     const modifiers = this.extractModifiers(bodyDecl.children?.modifier);

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import logger from '../../utils/logger';
 
 export interface MemoryConfiguration {
@@ -181,7 +182,7 @@ export class MemoryScalingService {
    */
   public static validateSystemMemory(config: MemoryConfiguration): boolean {
     try {
-      const totalRAM = require('os').totalmem();
+      const totalRAM = os.totalmem();
       const totalGB = Math.round(totalRAM / (1024 * 1024 * 1024));
       
       // Extract numeric value from heap size (e.g., '8g' -> 8)

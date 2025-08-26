@@ -332,7 +332,10 @@ program
           
           while (!neo4jReady && retries > 0) {
             try {
-              execSync('docker exec aide-neo4j-1 cypher-shell -u neo4j -p aaswe-password "RETURN 1"', { stdio: 'pipe' });
+              execSync('docker compose exec -T neo4j cypher-shell -u neo4j -p aaswe-password "RETURN 1"', {
+                stdio: 'pipe',
+                cwd: packageRoot
+              });
               neo4jReady = true;
               logger.info('✅ Neo4j is ready and accepting connections');
             } catch (error) {
@@ -797,7 +800,6 @@ program
        // Import and initialize real Layer 3 service
        const { Layer3AIService } = await import('../services/layer3/index');
        const { InMemoryRDFStore } = await import('../services/layer2/in-memory-rdf');
-       const { Neo4jDatabaseService } = await import('../services/layer2/neo4j-database');
 
        const { IndexType } = await import('../services/layer2/in-memory-rdf');
        const rdfStore = new InMemoryRDFStore({
@@ -825,14 +827,7 @@ program
            enableTokenOptimization: true
          }
        });
-       const neo4jService = new Neo4jDatabaseService();
-
-       // Connect to Neo4j
-       await neo4jService.connect({
-         uri: options.neo4jUri || 'bolt://localhost:7687',
-         username: options.neo4jUsername || 'neo4j',
-         password: options.neo4jPassword || 'aaswe-password'
-       });
+       // Reuse the already-connected neo4jService from above
 
        const layer3Config = {
          rag: {
@@ -859,15 +854,7 @@ program
 
      } else {
        console.log('⚠️  No API keys found - using direct Neo4j service without AI features');
-       // Create a direct Neo4j service that can execute queries without AI
-       const { Neo4jDatabaseService } = await import('../services/layer2/neo4j-database');
-       const neo4jService = new Neo4jDatabaseService();
-
-       await neo4jService.connect({
-         uri: options.neo4jUri || 'bolt://localhost:7687',
-         username: options.neo4jUsername || 'neo4j',
-         password: options.neo4jPassword || 'aaswe-password'
-       });
+       // Reuse the already-connected neo4jService from above
 
        layer3Service = {
          query: async (req: any) => {
@@ -914,7 +901,7 @@ program
                  answer: 'Direct Neo4j access available. Use cypher queries to explore the knowledge graph. For AI-powered features, configure API keys.',
                  confidence: 0.8,
                  sources: ['Neo4j Database', 'TTL Knowledge Files'],
-                 explanation: 'Neo4j database contains 6,796+ nodes with code structure. Use cypher queries for direct access.',
+                 explanation: 'Neo4j connection available. Use Cypher queries to explore the knowledge graph. Configure API keys for AI-powered features.',
                  metadata: { processingTime: Date.now() - startTime, service: 'rag' as const, cached: false, queryId: '', timestamp: Date.now() }
                };
              }
@@ -1096,8 +1083,8 @@ program
             clearInterval(keepAlive);
             resolve();
           };
-          process.on('SIGINT', handleShutdown);
-          process.on('SIGTERM', handleShutdown);
+          // Rely on the outer process signal handlers that already perform shutdown.
+          process.once('beforeExit', handleShutdown);
         });
      }
 

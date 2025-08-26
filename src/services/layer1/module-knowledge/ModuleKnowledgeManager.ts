@@ -191,17 +191,14 @@ export class ModuleKnowledgeManager extends EventEmitter {
     try {
       const knowledgeFilePath = this.getKnowledgeFilePath(sourceFilePath);
       
-      // DEBUG: Log the AST result data received
-      console.log('🔍 DEBUG ModuleKnowledgeManager.updateKnowledgeFileFromCode:');
-      console.log('  sourceFilePath:', sourceFilePath);
-      console.log('  astResult keys:', Object.keys(astResult || {}));
-      console.log('  astResult.classes:', astResult?.classes?.length || 0, 'classes');
-      console.log('  astResult.functions:', astResult?.functions?.length || 0, 'functions');
-      
-      if (astResult?.classes?.length > 0) {
-        console.log('  First class:', astResult.classes[0]);
-        console.log('  First class methods:', astResult.classes[0]?.methods?.length || 0);
-      }
+      logger.debug('Received AST result for knowledge file update', {
+        sourceFilePath,
+        astResultKeys: Object.keys(astResult || {}),
+        classCount: astResult?.classes?.length || 0,
+        functionCount: astResult?.functions?.length || 0,
+        firstClassName: astResult?.classes?.[0]?.name,
+        firstClassMethodCount: astResult?.classes?.[0]?.methods?.length || 0
+      });
       
       logger.info('Updating knowledge file from code changes', {
         sourceFile: sourceFilePath,

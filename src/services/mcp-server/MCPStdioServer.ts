@@ -10,7 +10,7 @@ import { EventEmitter } from 'events';
 import { readFile, stat } from 'fs/promises';
 import { watch, FSWatcher } from 'chokidar';
 import { glob } from 'glob';
-import { relative } from 'path';
+import { relative, resolve, sep } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { stdin, stdout } from 'process';
 import logger from '../../utils/logger';
@@ -450,7 +450,7 @@ export class MCPStdioServer extends EventEmitter {
    */
   private async handleQueryKnowledge(args: any): Promise<MCPToolResult> {
     try {
-      const response = await this.layer3Service.query({
+      const raw: any = await this.layer3Service.query({
         query: args.query,
         type: args.type || 'auto',
         ...(args.includeSourceFiles && {
@@ -459,6 +459,19 @@ export class MCPStdioServer extends EventEmitter {
           }
         })
       });
+
+      // Normalize response to ensure consistent schema
+      const response = 'response' in raw
+        ? raw
+        : {
+            query: raw?.query ?? String(args.query),
+            type: (raw?.type === 'auto' ? 'rag' : raw?.type) as any,
+            response: String(raw?.answer ?? raw?.response ?? ''),
+            confidence: typeof raw?.confidence === 'number' ? raw.confidence : 0,
+            sources: Array.isArray(raw?.sources) ? raw.sources : [],
+            executionTime: typeof raw?.executionTime === 'number' ? raw.executionTime : (raw?.metadata?.processingTime ?? 0),
+            metadata: raw?.metadata ?? {}
+          };
 
       return {
         content: [{
@@ -522,8 +535,25 @@ export class MCPStdioServer extends EventEmitter {
    */
   private async handleGetFileContent(args: any): Promise<MCPToolResult> {
     try {
-      const content = await readFile(args.filePath, 'utf-8');
-      const stats = await stat(args.filePath);
+      if (!args.filePath || typeof args.filePath !== 'string') {
+        throw new Error('filePath must be a string');
+      }
+
+      const resolvedPath = resolve(args.filePath);
+      const projectRoot = process.cwd();
+
+      if (!resolvedPath.startsWith(projectRoot + sep)) {
+        throw new Error('Access outside project root is not allowed');
+      }
+
+      const stats = await stat(resolvedPath);
+      const maxSize = 1024 * 1024; // 1MB default
+
+      if (stats.size > maxSize) {
+        throw new Error(`File exceeds size limit (${maxSize} bytes)`);
+      }
+
+      const content = await readFile(resolvedPath, 'utf-8');
       
       let responseContent = content;
       
@@ -536,15 +566,15 @@ export class MCPStdioServer extends EventEmitter {
       }
       
       const result: any = {
-        filePath: args.filePath,
+        filePath: resolvedPath,
         content: responseContent
       };
-      
+
       if (args.includeMetadata) {
         result.metadata = {
           size: stats.size,
           lastModified: stats.mtime.toISOString(),
-          language: this.detectLanguage(args.filePath),
+          language: this.detectLanguage(resolvedPath),
           lineCount: content.split('\n').length
         };
       }
