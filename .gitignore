@@ -96,3 +96,4 @@ temp/
 .jest/
 test-results/
 keycloak-config-cli/
+keycloak-config-cli/
