@@ -827,7 +827,7 @@ program
            enableTokenOptimization: true
          }
        });
-       // Reuse the already-connected neo4jService from above
+       // neo4jService is already connected above at line 712-719
 
        const layer3Config = {
          rag: {
@@ -854,7 +854,7 @@ program
 
      } else {
        console.log('⚠️  No API keys found - using direct Neo4j service without AI features');
-       // Reuse the already-connected neo4jService from above
+       // neo4jService is already connected above at line 712-719
 
        layer3Service = {
          query: async (req: any) => {
@@ -919,7 +919,7 @@ program
            }
          },
          initialize: async () => {},
-         shutdown: async () => { await neo4jService.disconnect(); },
+         shutdown: async () => { /* Neo4j disconnect handled by main shutdown handler */ },
          getStatus: () => ({ overall: 'healthy' as const, services: { rag: { name: 'rag', enabled: false, healthy: false, lastCheck: new Date() }, graphCypher: { name: 'graphCypher', enabled: true, healthy: true, lastCheck: new Date() }, sparql: { name: 'sparql', enabled: false, healthy: false, lastCheck: new Date() } }, lastUpdated: new Date() }),
          getMetrics: () => ({ overall: { totalQueries: 0, successfulQueries: 0, failedQueries: 0, averageResponseTime: 0, queriesPerSecond: 0 }, services: { rag: { queries: 0, successRate: 0, averageResponseTime: 0, cacheHitRate: 0 }, graphCypher: { queries: 0, successRate: 0, averageResponseTime: 0, averageConfidence: 0 }, sparql: { queries: 0, successRate: 0, averageResponseTime: 0, averageConfidence: 0 } }, routing: { autoDetected: 0, manuallySpecified: 0, routingAccuracy: 0, fallbackUsed: 0 }, performance: { memoryUsage: 0, cpuUsage: 0, cacheSize: 0, activeConnections: 0 } })
        } as any;
