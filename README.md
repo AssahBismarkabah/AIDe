@@ -8,43 +8,20 @@ AASWE transforms your codebase into structured semantic knowledge (RDF/TTL forma
 
 ##  Quick Start
 
-> **Package Status**: Available on NPM Registry https://www.npmjs.com/package/@aaswe/codebase-ai
-
-### Option 1: NPM Installation (Recommended)
+### For Users (NPM Installation)
 ```bash
-# Install from NPM registry
+# Install and use
 npm install -g @aaswe/codebase-ai
-
-# Navigate to your project and start
 cd your-project
-
-# For lightweight mode (TTL files only)
-codebase-ai start
-
-# For complete system (Neo4j + MCP Server + Redis)
 codebase-ai full-start
-
-# Start MCP server for IDE integration
-codebase-ai mcp --transport both
 ```
 
-### Option 2: Docker Compose (Full System)
+### For Developers (Source Code)
 ```bash
-# Clone and start
+# Clone and run from source
 git clone https://github.com/AssahBismarkabah/AIDe.git
 cd AIDe
-docker-compose up -d
-```
-
-### Option 3: Local Development
-```bash
-# Clone repository for development
-git clone https://github.com/AssahBismarkabah/AIDe.git
-cd AIDe
-npm install
-npm run build
-
-# Run locally (from source)
+npm install && npm run build
 node dist/cli/index.js full-start --build
 ```
 
@@ -199,14 +176,12 @@ codebase-ai start --mode full --port 8000
 # Complete system with all containers (Neo4j + MCP + Redis)
 codebase-ai full-start
 
-# For source installations only
-codebase-ai full-start --build
 
 # With debug logging
 codebase-ai start --debug
 ```
 
-#### MCP Server Commands (NEW)
+#### MCP Server Commands 
 ```bash
 # Start MCP server with stdio transport (for RooCode/Cline)
 codebase-ai mcp --transport stdio
@@ -267,7 +242,7 @@ AASWE provides **dual-transport MCP support** for maximum IDE compatibility:
 # Option 1: Full system with containers (npm installation)
 codebase-ai full-start --project-path ./your-project
 
-# Option 1b: Full system with containers (source installation)
+# Option 1b: Full system with containers (source installation only)
 node dist/cli/index.js full-start --project-path ./your-project --build
 
 # Option 2: Standalone MCP server (TTL files only)
@@ -275,6 +250,20 @@ codebase-ai mcp --transport stdio --ttl-directories ./your-project
 ```
 
 2. **Add to RooCode/Cline MCP Settings**:
+
+**For NPM Installation (Recommended):**
+```json
+{
+  "mcpServers": {
+    "aaswe": {
+      "command": "codebase-ai",
+      "args": ["mcp", "--transport", "stdio", "--ttl-directories", "/path/to/your/project"]
+    }
+  }
+}
+```
+
+**For Source Installation (Developers):**
 ```json
 {
   "mcpServers": {
@@ -287,22 +276,7 @@ codebase-ai mcp --transport stdio --ttl-directories ./your-project
         "stdio",
         "--ttl-directories",
         "/path/to/your/project"
-      ],
-      "env": {
-        "NODE_ENV": "production"
-      }
-    }
-  }
-}
-```
-
-**Global Installation (NPM):**
-```json
-{
-  "mcpServers": {
-    "aaswe": {
-      "command": "codebase-ai",
-      "args": ["mcp", "--transport", "stdio", "--ttl-directories", "/path/to/your/project"]
+      ]
     }
   }
 }
@@ -501,9 +475,11 @@ docker-compose ps neo4j
 # Restart Neo4j
 docker-compose restart neo4j
 
-# Start full system properly
+# Start full system properly (npm installation)
 codebase-ai full-start
 
+# Or for source installation
+node dist/cli/index.js full-start --build
 ```
 #### "Docker Compose Not Available"
 If you see `unknown shorthand flag: 'd' in -d` or similar Docker errors:

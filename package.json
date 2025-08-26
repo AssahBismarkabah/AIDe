@@ -19,11 +19,19 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "clean": "rm -rf dist",
     "prepare": "npm run build",
-    "docker:build": "docker build -t aaswe/codebase-ai .",
+    "docker:build": "docker build -t aaswe/codebase-ai:latest -t aaswe/codebase-ai:$npm_package_version .",
+    "docker:push": "docker push aaswe/codebase-ai:latest && docker push aaswe/codebase-ai:$npm_package_version",
+    "docker:build-and-push": "npm run docker:build && npm run docker:push",
+    "docker:login": "echo 'Please run: docker login' to authenticate with Docker Hub",
     "docker:run": "docker run -p 3001:3001 -p 7474:7474 -p 7687:7687 aaswe/codebase-ai",
     "docker:compose": "docker-compose up -d",
     "docker:compose:down": "docker-compose down",
-    "docker:compose:logs": "docker-compose logs -f"
+    "docker:compose:logs": "docker-compose logs -f",
+    "cli": "node dist/cli/index.js",
+    "cli:full-start": "node dist/cli/index.js full-start",
+    "cli:full-start:build": "node dist/cli/index.js full-start --build",
+    "cli:analyze": "node dist/cli/index.js analyze",
+    "cli:mcp": "node dist/cli/index.js mcp"
   },
   "keywords": [
     "ai",

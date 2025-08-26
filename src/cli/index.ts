@@ -502,7 +502,12 @@ program
           
           if (!neo4jReady) {
             logger.error('❌ Neo4j failed to start within timeout');
-            logger.info('💡 Try: docker compose down && codebase-ai full-start --build');
+            if (isSourceInstallation) {
+              logger.info('💡 Try: docker compose down && codebase-ai full-start --build');
+            } else {
+              logger.info('💡 Try: docker compose down && codebase-ai full-start');
+              logger.info('📦 Pre-built images will be pulled automatically');
+            }
             process.exit(1);
           }
           
@@ -638,7 +643,12 @@ program
               logger.info('💡 To stop all services: codebase-ai docker down');
             } else {
               logger.error('❌ Failed to start MCP server');
-              logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
+              if (isSourceInstallation) {
+                logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
+              } else {
+                logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start');
+                logger.info('📦 Pre-built images will be pulled automatically');
+              }
               process.exit(mcpCode);
             }
           });

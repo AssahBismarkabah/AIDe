@@ -1,6 +1,8 @@
 services:
   # AASWE MCP Server - Main application
   aaswe-server:
+    # The build section below will be used only when --build flag is specified
+    image: aaswe/codebase-ai:latest
     build:
       context: .
       dockerfile: Dockerfile
