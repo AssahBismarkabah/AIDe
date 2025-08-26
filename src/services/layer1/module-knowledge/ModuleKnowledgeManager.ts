@@ -68,7 +68,13 @@ export class ModuleKnowledgeManager extends EventEmitter {
       ...options
     };
 
-    this.rdfService = new RDFService();
+    // CRITICAL FIX: Create RDFService with proper configuration to prevent business context placeholders
+    this.rdfService = new RDFService(this.options.rdfGenerationOptions || {
+      includeBusinessContext: false,
+      generatePlaceholders: false, // CRITICAL: Prevent mock "E-commerce" placeholders
+      optimizeForLLM: true,
+      optimizeForNeo4j: true
+    });
     this.rdfValidator = new RDFValidator();
     this.backupDirectory = path.join(process.cwd(), '.aaswe', 'backups');
     this.mcpContextCache = new Map();
@@ -184,6 +190,15 @@ export class ModuleKnowledgeManager extends EventEmitter {
   ): Promise<ModuleKnowledgeResult<ModuleKnowledgeFile>> {
     try {
       const knowledgeFilePath = this.getKnowledgeFilePath(sourceFilePath);
+      
+      logger.debug('Received AST result for knowledge file update', {
+        sourceFilePath,
+        astResultKeys: Object.keys(astResult || {}),
+        classCount: astResult?.classes?.length || 0,
+        functionCount: astResult?.functions?.length || 0,
+        firstClassName: astResult?.classes?.[0]?.name,
+        firstClassMethodCount: astResult?.classes?.[0]?.methods?.length || 0
+      });
       
       logger.info('Updating knowledge file from code changes', {
         sourceFile: sourceFilePath,

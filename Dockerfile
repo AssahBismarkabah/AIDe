@@ -12,18 +12,24 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files and source code
 COPY package*.json ./
+COPY tsconfig.json ./
+COPY src/ ./src/
 
-# Install only production dependencies without running scripts
-RUN npm install --only=production --legacy-peer-deps --ignore-scripts
+# Install all dependencies (including dev deps for building)
+RUN npm ci --legacy-peer-deps
 
-# Copy pre-built application files
-COPY dist/ ./dist/
+# Build TypeScript -> dist
+RUN npm run build
+
 COPY docker-compose.yml ./
 COPY .env.example ./
 COPY docs/ ./docs/
 COPY scripts/ ./scripts/
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production --legacy-peer-deps
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -42,5 +48,11 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3001/health || exit 1
 
-# Start the application
-CMD ["node", "dist/cli/index.js", "start"]
+# Start the application (read sensitive values from env)
+SHELL ["/bin/sh", "-c"]
+CMD node dist/cli/index.js mcp \
+  --transport both \
+  --ttl-directories ./knowledge \
+  --neo4j-uri "${NEO4J_URI:-bolt://neo4j:7687}" \
+  --neo4j-username "${NEO4J_USERNAME:-neo4j}" \
+  --neo4j-password "${NEO4J_PASSWORD:?NEO4J_PASSWORD not set}"

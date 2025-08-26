@@ -21,8 +21,7 @@ import {
 import {
   RDF_NAMESPACES,
   ONTOLOGY_CLASSES,
-  ONTOLOGY_PROPERTIES,
-  BUSINESS_CONTEXT_PLACEHOLDERS
+  ONTOLOGY_PROPERTIES
 } from './ontology';
 
 const { namedNode, literal, quad } = DataFactory;
@@ -136,8 +135,7 @@ export class EnhancedRDFGenerator extends RDFGenerator {
     // Generate quality metrics
     this.addQualityMetrics(store, moduleUri, concreteStructure.qualityMetrics);
     
-    // Generate business context placeholders
-    this.addBusinessContextPlaceholdersEnhanced(store, moduleUri);
+    // Note: Business context placeholders removed - only concrete code information needed
 
     // Serialize to TTL
     return await this.serializeStoreToTTL(store);
@@ -426,18 +424,6 @@ export class EnhancedRDFGenerator extends RDFGenerator {
     store.addQuad(quad(metricsUri, namedNode(`${RDF_NAMESPACES.quality}documentationQuality`), literal(metrics.documentation.quality)));
     
     store.addQuad(quad(moduleUri, namedNode(`${RDF_NAMESPACES.quality}hasMetrics`), metricsUri));
-  }
-
-  /**
-   * Add business context placeholders
-   */
-  private addBusinessContextPlaceholdersEnhanced(store: Store, moduleUri: any): void {
-    // Add structured placeholders for business context enhancement
-    store.addQuad(quad(moduleUri, namedNode(`${RDF_NAMESPACES.business}domainPlaceholder`), literal(BUSINESS_CONTEXT_PLACEHOLDERS.domain.example)));
-    store.addQuad(quad(moduleUri, namedNode(`${RDF_NAMESPACES.business}businessRulesPlaceholder`), literal(BUSINESS_CONTEXT_PLACEHOLDERS.businessRules.example)));
-    store.addQuad(quad(moduleUri, namedNode(`${RDF_NAMESPACES.business}useCasesPlaceholder`), literal(BUSINESS_CONTEXT_PLACEHOLDERS.useCases.example)));
-    store.addQuad(quad(moduleUri, namedNode(`${RDF_NAMESPACES.business}qualityAttributesPlaceholder`), literal(BUSINESS_CONTEXT_PLACEHOLDERS.qualityAttributes.example)));
-    store.addQuad(quad(moduleUri, namedNode(`${RDF_NAMESPACES.business}constraintsPlaceholder`), literal(BUSINESS_CONTEXT_PLACEHOLDERS.constraints.example)));
   }
 
   /**

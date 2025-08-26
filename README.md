@@ -1,84 +1,91 @@
-# AASWE - AI-Assisted Engineering
+# AASWE - AI-Assisted Software Engineering
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Rich codebase context for IDE LLMs through automatic analysis and knowledge graph generation.**
+**Rich codebase context for IDE LLMs through automatic analysis and TTL knowledge generation.**
 
-AASWE transforms your codebase into structured knowledge that enhances your IDE's AI capabilities. Get better code suggestions, more accurate refactoring, and deeper insights by providing your LLM with comprehensive project context.
+AASWE transforms your codebase into structured semantic knowledge (RDF/TTL format) that enhances your IDE's AI capabilities. Get better code suggestions, more accurate refactoring, and deeper insights by providing your LLM with comprehensive project context through the Model Context Protocol (MCP).
 
 ##  Quick Start
 
-> ** Package Status**: Ready for NPM publication! Currently available as tarball for testing.
+> **Package Status**: Available on NPM Registry https://www.npmjs.com/package/@aaswe/codebase-ai
 
-### Option 1: One-Command Complete Setup  (Recommended)
+### Option 1: NPM Installation (Recommended)
 ```bash
-# Install, setup, and start complete system with all containers
-curl -fsSL https://raw.githubusercontent.com/aaswe/codebase-ai/main/scripts/one-command-deploy.sh | bash
-```
-**This gives you everything**: Neo4j database + MCP server + Redis cache
-
-### Option 2: NPM Installation (Coming Soon)
-```bash
-# Will be available after NPM publication
+# Install from NPM registry
 npm install -g @aaswe/codebase-ai
+
+# Navigate to your project and start
+cd your-project
 
 # For lightweight mode (TTL files only)
 codebase-ai start
 
-# For complete system (all containers)
-codebase-ai full-start
+# For complete system (Neo4j + MCP Server + Redis)
+codebase-ai full-start --build
+
+# Start MCP server for IDE integration
+codebase-ai mcp --transport both
 ```
 
-### Option 3: Direct Installation (Current)
-```bash
-# Download and install from tarball
-curl -L -o codebase-ai.tgz https://github.com/aaswe/codebase-ai/releases/latest/download/aaswe-codebase-ai-1.0.0.tgz
-npm install -g ./codebase-ai.tgz
-
-# Initialize and start complete system
-cd your-project
-codebase-ai init --mode full
-codebase-ai full-start
-```
-
-### Option 3: Docker Compose (Full System)
+### Option 2: Docker Compose (Full System)
 ```bash
 # Clone and start
-git clone https://github.com/aaswe/codebase-ai.git
-cd codebase-ai
+git clone https://github.com/AssahBismarkabah/AIDe.git
+cd AIDe
 docker-compose up -d
 ```
 
+### Option 3: Local Development
+```bash
+# Clone repository for development
+git clone https://github.com/AssahBismarkabah/AIDe.git
+cd AIDe
+npm install
+npm run build
+
+# Run locally
+node dist/cli/index.js full-start --build
+```
+
+##  Visual Overview
+
+![Neo4j Knowledge Graph](main/docs/Screenshot%20from%202025-08-22%2016-24-47.png)
+
+**Live Knowledge Graph Visualization** - AASWE automatically generates comprehensive Neo4j graph databases showing your codebase structure. The example above shows a java codebase:
+
+- ** Module Nodes**: Each directory/module represented as connected nodes
+- ** Dependency Relationships**: Clear visualization of how modules depend on each other
+- ** Entity Metrics**: Real class, method, and function counts displayed on nodes
+- ** Architecture Patterns**: Visual detection of architectural layers and patterns
+- **Interactive Exploration**: Click and explore your codebase structure in real-time
+
 ##  Features
 
-###  **Triple Context System**
-- **TTL Metadata**: Structured semantic knowledge in RDF/TTL format
-- **Neo4j Source Code**: Complete source code + relationships in graph database
-- **MCP Integration**: Universal IDE compatibility with unified context delivery
+###  **Semantic Knowledge Generation**
+- **TTL Files**: Structured semantic knowledge in RDF/TTL format for each module
+- **Real Entity Counts**: Actual class, function, and dependency statistics
+- **Module-Level Context**: Comprehensive analysis of code structure and relationships
+- **Business Context**: Preserves developer annotations and domain knowledge
 
 ###  **Multi-Language Code Analysis**
 - **12 Languages**: TypeScript, JavaScript, Python, Java, Go, Rust, C++, C#, PHP, Ruby, Kotlin, Scala, Swift
-- **Complete Source Storage**: Full source code stored in Neo4j for LLM queries
-- **Concrete Information**: Real class names, method signatures, dependencies
-- **Architectural Patterns**: Factory, Singleton, Observer, Builder pattern detection
+- **Recursive Discovery**: Finds and analyzes all source files throughout project tree
+- **Concrete Information**: Real class names, method signatures, dependencies, imports
+- **Architectural Patterns**: Detects common design patterns and code structures
 
-###  **Automatic Synchronization**
-- **Git Integration**: Auto-updates on commits and merges
-- **TTL File Changes**: Automatic Neo4j knowledge graph updates
-- **Source Code Changes**: Automatic TTL regeneration + graph updates
-- **Business Context Preservation**: Maintains developer annotations during re-analysis
+### **Universal IDE Integration via MCP**
+- **Model Context Protocol**: Works with any MCP-compatible IDE
+- **Dual Transport**: WebSocket and Stdio support for maximum compatibility
+- **RooCode/Cline**: Stdio transport for CLI-based IDEs
+- **VS Code/Cursor**: WebSocket transport for GUI IDEs
+- **Real-time Updates**: File watching and automatic context refresh
 
-### **Universal IDE Integration**
-- **Model Context Protocol (MCP)**: Works with any MCP-compatible IDE
-- **VS Code + Continue**: Native integration
-- **Cursor**: Built-in MCP support
-- **Real-time Context**: Always-current codebase knowledge
-
-###  **One-Command Deployment**
-- **Complete System**: Neo4j + MCP Server + Redis with single command
-- **Lightweight Mode**: TTL-only mode for individual developers
-- **Docker Compose**: Full containerized deployment
-- **Neo4j Browser**: Built-in graph visualization and exploration
+###  **Flexible Deployment Options**
+- **Context-Only Mode**: TTL files only (recommended for most users)
+- **Full System Mode**: Neo4j + MCP Server + Redis for advanced features
+- **Docker Compose**: Complete containerized deployment
+- **Local Installation**: NPM package for easy setup
 
 ##  System Requirements
 
@@ -130,8 +137,29 @@ codebase-ai start
 # Full system mode
 codebase-ai start --mode full --port 8000
 
+# Complete system with all containers (Neo4j + MCP + Redis)
+codebase-ai full-start --build
+
 # With debug logging
 codebase-ai start --debug
+```
+
+#### MCP Server Commands (NEW)
+```bash
+# Start MCP server with stdio transport (for RooCode/Cline)
+codebase-ai mcp --transport stdio
+
+# Start MCP server with WebSocket transport (for VS Code/Cursor)
+codebase-ai mcp --transport websocket --port 3001
+
+# Start both transports (maximum compatibility)
+codebase-ai mcp --transport both --port 3001
+
+# With Neo4j integration
+codebase-ai mcp --transport both --neo4j-uri bolt://localhost:7687 --neo4j-username neo4j --neo4j-password aaswe-password
+
+# With debug logging
+codebase-ai mcp --transport stdio --debug
 ```
 
 #### Analyze Your Project
@@ -169,30 +197,91 @@ codebase-ai docker down
 
 ### IDE Configuration
 
-#### VS Code with Continue
-1. Install the [Continue extension](https://marketplace.visualstudio.com/items?itemName=Continue.continue)
-2. Add to your Continue `config.json`:
+AASWE provides **dual-transport MCP support** for maximum IDE compatibility:
+
+#### RooCode / Cline (Stdio Transport)
+1. **Start AASWE System** (in your project directory):
+```bash
+# Option 1: Full system with containers
+node dist/cli/index.js full-start --project-path ./your-project --build
+
+# Option 2: Standalone MCP server (TTL files only)
+node dist/cli/index.js mcp --transport stdio --ttl-directories ./your-project
+```
+
+2. **Add to RooCode/Cline MCP Settings**:
+```json
+{
+  "mcpServers": {
+    "aaswe": {
+      "command": "node",
+      "args": [
+        "/path/to/aaswe/dist/cli/index.js",
+        "mcp",
+        "--transport",
+        "stdio",
+        "--ttl-directories",
+        "/path/to/your/project"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**Global Installation (NPM):**
 ```json
 {
   "mcpServers": {
     "aaswe": {
       "command": "codebase-ai",
-      "args": ["start", "--port", "3001"],
+      "args": ["mcp", "--transport", "stdio", "--ttl-directories", "/path/to/your/project"]
+    }
+  }
+}
+```
+
+#### VS Code with Continue (WebSocket)
+1. Install the [Continue extension](https://marketplace.visualstudio.com/items?itemName=Continue.continue)
+2. **Start AASWE WebSocket Server**:
+```bash
+node dist/cli/index.js mcp --transport websocket --port 3001
+```
+3. Add to your Continue `config.json`:
+```json
+{
+  "mcpServers": {
+    "aaswe": {
+      "command": "codebase-ai",
+      "args": ["mcp", "--transport", "websocket", "--port", "3001"],
       "env": {}
     }
   }
 }
 ```
 
-#### Cursor
-1. Go to **Settings → Features → Model Context Protocol**
-2. Add server:
+#### Cursor (WebSocket)
+1. **Start AASWE WebSocket Server**:
+```bash
+node dist/cli/index.js mcp --transport websocket --port 3001
+```
+2. Go to **Settings → Features → Model Context Protocol**
+3. Add server:
    - **Name**: AASWE
    - **Command**: `codebase-ai`
-   - **Args**: `["start", "--port", "3001"]`
+   - **Args**: `["mcp", "--transport", "websocket", "--port", "3001"]`
+
+#### Both Transports (Maximum Compatibility)
+```bash
+# Start both WebSocket and Stdio transports
+node dist/cli/index.js mcp --transport both --port 3001
+```
 
 #### Other IDEs
-Connect to the MCP server at `ws://localhost:3001`
+- **WebSocket**: Connect to `ws://localhost:3001`
+- **Stdio**: Use command-line MCP client with stdio transport
 
 ##  Project Structure
 
@@ -346,6 +435,34 @@ docker-compose ps neo4j
 
 # Restart Neo4j
 docker-compose restart neo4j
+
+# Start full system properly
+codebase-ai full-start --build
+```
+
+#### "MCP Server Connection Issues"
+```bash
+# Test MCP stdio connection
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | codebase-ai mcp --transport stdio
+
+# Check if MCP server is running
+codebase-ai status --port 3001
+
+# Restart with debug logging
+codebase-ai mcp --transport both --debug
+
+# For RooCode: Ensure correct path in MCP settings
+ls -la /path/to/your/project/dist/cli/index.js
+```
+
+#### "TTL files showing zero counts"
+```bash
+# This was a known bug - now resolved!
+# Re-analyze to get real entity counts
+codebase-ai analyze --output ./knowledge
+
+# Check if TTL files contain real data
+grep -E "(classCount|functionCount|methodCount)" ./knowledge/*.ttl
 ```
 
 ### Performance Optimization
@@ -397,8 +514,8 @@ We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md)
 ### Development Setup
 ```bash
 # Clone repository
-git clone https://github.com/aaswe/codebase-ai.git
-cd codebase-ai
+git clone https://github.com/AssahBismarkabah/AIDe.git
+cd AIDe
 
 # Install dependencies
 npm install
@@ -434,11 +551,10 @@ npm run test:watch
 
 ##  Links
 
-- **GitHub**: https://github.com/aaswe/codebase-ai
+- **GitHub**: https://github.com/AssahBismarkabah/AIDe
 - **NPM Package**: https://www.npmjs.com/package/@aaswe/codebase-ai
-- **Documentation**: https://aaswe.github.io/codebase-ai
-- **Issues**: https://github.com/aaswe/codebase-ai/issues
-- **Discussions**: https://github.com/aaswe/codebase-ai/discussions
+- **Issues**: https://github.com/AssahBismarkabah/AIDe/issues
+- **Discussions**: https://github.com/AssahBismarkabah/AIDe/discussions
 
 ##  License
 

@@ -8,7 +8,7 @@
 import { readFile, stat, access } from 'fs/promises';
 import { watch, FSWatcher } from 'chokidar';
 import { glob } from 'glob';
-import { dirname, relative } from 'path';
+import { dirname, relative, posix as pathPosix } from 'path';
 import { createHash } from 'crypto';
 import { EventEmitter } from 'events';
 import logger from '../../utils/logger';
@@ -271,8 +271,18 @@ export class TTLContextLoader extends EventEmitter {
    */
   private async initializeFileWatcher(): Promise<void> {
     const patterns = this.config.watchPatterns || ['**/*.module-knowledge.ttl'];
+    const directories = (this.config as any).directories || ['./'];
     
-    this.fileWatcher = watch(patterns, {
+    // Create directory-specific watch patterns
+    const watchPatterns: string[] = [];
+    for (const directory of directories) {
+      for (const pattern of patterns) {
+        const watchPattern = directory === './' ? pattern : `${directory.replace(/\/$/, '')}/${pattern}`;
+        watchPatterns.push(watchPattern);
+      }
+    }
+    
+    this.fileWatcher = watch(watchPatterns, {
       ignored: this.config.watchIgnored || [/node_modules/, /.git/, /dist/, /build/],
       persistent: true,
       ignoreInitial: true,
@@ -286,7 +296,10 @@ export class TTLContextLoader extends EventEmitter {
     this.fileWatcher.on('change', (path) => this.handleFileEvent('modified', path));
     this.fileWatcher.on('unlink', (path) => this.handleFileEvent('deleted', path));
     
-    logger.info('TTL file watcher initialized', { patterns });
+    logger.info('TTL file watcher initialized', {
+      patterns: watchPatterns,
+      directories
+    });
   }
 
   /**
@@ -323,14 +336,23 @@ export class TTLContextLoader extends EventEmitter {
   private async loadAllTTLFiles(): Promise<void> {
     try {
       const patterns = this.config.loadPatterns || ['**/*.module-knowledge.ttl'];
+      const directories = (this.config as any).directories || ['./'];
       const ttlFiles: string[] = [];
       
-      for (const pattern of patterns) {
-        const files = await glob(pattern, {
-          ignore: this.config.loadIgnored || ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
-          absolute: true
-        });
-        ttlFiles.push(...files);
+      // Search within specified directories only
+      for (const directory of directories) {
+        for (const pattern of patterns) {
+          // Combine directory with pattern, avoiding double slashes
+          const base = directory === './' ? '' : directory.replace(/[\\/]+$/, '');
+          const searchPattern = base ? pathPosix.join(base, pattern) : pattern;
+
+          const files = await glob(searchPattern, {
+            ignore: this.config.loadIgnored || ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
+            absolute: true,
+            windowsPathsNoEscape: true
+          });
+          ttlFiles.push(...files);
+        }
       }
       
       logger.info(`Found ${ttlFiles.length} TTL files to load`);

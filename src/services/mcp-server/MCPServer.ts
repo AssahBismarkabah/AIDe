@@ -15,8 +15,13 @@ import { relative, dirname } from 'path';
 import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../../utils/logger';
-import { Layer3AIService } from '../layer3/index';
+import { AIQueryRequest, AIQueryResponse } from '../layer3/index';
 import { HybridStorageManager } from '../layer2/hybrid-storage/HybridStorageManager';
+
+// Generic query service interface that can be either Layer3AIService or direct Neo4j service
+interface QueryService {
+  query(request: AIQueryRequest): Promise<AIQueryResponse>;
+}
 import {
   MCPServerConfig,
   MCPRequest,
@@ -48,7 +53,7 @@ export class MCPServer extends EventEmitter {
   private config: MCPServerConfig;
   private server: Server;
   private wsServer: WebSocketServer;
-  private layer3Service: Layer3AIService;
+  private layer3Service: QueryService;
   // private _hybridStorage: HybridStorageManager;
   
   private clients: Map<string, MCPClient> = new Map();
@@ -65,7 +70,7 @@ export class MCPServer extends EventEmitter {
 
   constructor(
     config: MCPServerConfig,
-    layer3Service: Layer3AIService,
+    layer3Service: QueryService,
     hybridStorage: HybridStorageManager
   ) {
     super();

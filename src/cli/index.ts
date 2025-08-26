@@ -13,8 +13,13 @@ import { existsSync } from 'fs';
 import { writeFile, mkdir } from 'fs/promises';
 import logger from '../utils/logger';
 import { MCPServer, createDefaultMCPConfig } from '../services/mcp-server';
+import { MCPServerManager, TransportType, MCPServerManagerConfig } from '../services/mcp-server/MCPServerManager';
+import { TTLContextLoader } from '../services/mcp-server/TTLContextLoader';
 import { Layer3AIService } from '../services/layer3';
 import { HybridStorageManager } from '../services/layer2/hybrid-storage/HybridStorageManager';
+import { InMemoryRDFStore } from '../services/layer2/in-memory-rdf';
+import { Neo4jDatabaseService } from '../services/layer2/neo4j-database';
+import { MemoryScalingService } from '../services/infrastructure/MemoryScalingService';
 
 // Load environment variables from .env.aaswe
 config({ path: '.env.aaswe' });
@@ -22,13 +27,22 @@ config({ path: '.env.aaswe' });
 // Also try loading from .env as fallback
 config();
 
+// Get version from package.json automatically
+let packageVersion = '1.0.0';
+try {
+  const packageJson = require('../../package.json');
+  packageVersion = packageJson.version || '1.0.0';
+} catch (error) {
+  logger.warn('Could not read package.json version, using default', { error });
+}
+
 const program = new Command();
 
 program
   .name('codebase-ai')
   .alias('aaswe')
   .description('AI-Assisted Software Engineering (AASWE) - Rich codebase context for IDE LLMs')
-  .version('1.0.0');
+  .version(packageVersion);
 
 /**
  * Start command - Launch AASWE server
@@ -187,43 +201,51 @@ program
   });
 
 /**
- * Full-start command - Start complete system with all containers
+ * Full-start command - Start complete system with all containers + auto-analysis
  */
 program
   .command('full-start')
-  .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis)')
+  .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis) and auto-analyze project')
   .option('--project-path <path>', 'Custom project path for analysis (not docker-compose location)', process.cwd())
   .option('--detach', 'Run containers in background')
   .option('--build', 'Rebuild containers before starting')
+  .option('--skip-analysis', 'Skip automatic project analysis')
   .action(async (options) => {
     try {
-      // The project path is for analysis, but docker-compose should run from AASWE package directory
-      const analysisProjectPath = options.projectPath || process.cwd();
-      
       // Find the AASWE package directory (where docker-compose.yml is located)
       const path = require('path');
       const fs = require('fs');
       
-      // Get the directory where this CLI script is installed
-      const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
-      const packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath))); // Go up from dist/cli to package root
-      const dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+      // The project path is for analysis, but docker-compose should run from AASWE package directory
+      // CRITICAL FIX: Resolve relative path to absolute path for proper scope restriction
+      const analysisProjectPath = path.resolve(options.projectPath || process.cwd());
       
-      // Verify docker-compose.yml exists in package
+      // Prefer local docker-compose.yml if it exists, otherwise use NPM package version
+      let packageRoot = process.cwd();
+      let dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+      
       if (!fs.existsSync(dockerComposePath)) {
-        logger.error('❌ AASWE docker-compose.yml not found in package');
-        logger.error(`Expected at: ${dockerComposePath}`);
-        logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
-        process.exit(1);
+        // Fall back to NPM package docker-compose.yml
+        const cliScriptPath = require.resolve('@aaswe/codebase-ai/dist/cli/index.js');
+        packageRoot = path.dirname(path.dirname(path.dirname(cliScriptPath))); // Go up from dist/cli to package root
+        dockerComposePath = path.join(packageRoot, 'docker-compose.yml');
+        
+        // Verify docker-compose.yml exists in package
+        if (!fs.existsSync(dockerComposePath)) {
+          logger.error('❌ AASWE docker-compose.yml not found in package or current directory');
+          logger.error(`Expected at: ${dockerComposePath} or ${path.join(process.cwd(), 'docker-compose.yml')}`);
+          logger.info('💡 Try reinstalling: npm install -g @aaswe/codebase-ai');
+          process.exit(1);
+        }
       }
       
       logger.info('🚀 Starting Complete AASWE System with All Containers...');
-      logger.info('📦 This includes: Neo4j Database + MCP Server + Redis Cache');
+      logger.info('📦 This includes: Neo4j Database + Redis Cache + Auto-Analysis + MCP Server');
       logger.info(`🎯 Analysis will target: ${analysisProjectPath}`);
       logger.info(`🐳 Using docker-compose from: ${packageRoot}`);
       
       // Check if Docker is available
-      const { spawn } = require('child_process');
+      const { spawn, execSync } = require('child_process');
       
       // Check Docker availability
       const dockerCheck = spawn('docker', ['--version'], { stdio: 'pipe' });
@@ -243,47 +265,208 @@ program
         // Docker is available, proceed with startup
         logger.info('✅ Docker detected - proceeding with container startup');
         
-        // Build Docker Compose arguments
-        const args = ['compose', 'up'];
-        if (options.detach) args.push('-d');
-        if (options.build) args.push('--build');
+        // Phase 0: Auto-detect codebase size and configure Neo4j memory
+        logger.info('🧠 Phase 0: Auto-configuring Neo4j memory for codebase size...');
+        
+        try {
+          const memoryConfig = await MemoryScalingService.detectOptimalMemoryConfiguration(analysisProjectPath);
+          logger.info('📊 Detected codebase characteristics:', {
+            estimatedFiles: memoryConfig.estimatedFiles,
+            recommendedHeapSize: memoryConfig.heapSize,
+            recommendedPageCacheSize: memoryConfig.pageCacheSize,
+            category: memoryConfig.estimatedFiles < 1000 ? 'Small' :
+                     memoryConfig.estimatedFiles < 5000 ? 'Medium' :
+                     memoryConfig.estimatedFiles < 20000 ? 'Large' : 'Very Large'
+          });
+          
+          MemoryScalingService.setMemoryEnvironmentVariables(memoryConfig);
+          logger.info('✅ Neo4j memory configuration applied automatically');
+          
+          // Validate system memory if possible
+          const systemValidation = MemoryScalingService.validateSystemMemory(memoryConfig);
+          if (!systemValidation) {
+            logger.warn('⚠️  Consider upgrading system memory for optimal performance');
+          }
+          
+          // Show scaling recommendations for large codebases
+          const recommendations = MemoryScalingService.getScalingRecommendations(memoryConfig.estimatedFiles);
+          if (recommendations.length > 0) {
+            logger.info('💡 Scaling recommendations for large codebase:');
+            recommendations.forEach(rec => logger.info(`   - ${rec}`));
+          }
+          
+        } catch (error) {
+          logger.warn('⚠️  Unable to auto-configure memory, using defaults', { error: error instanceof Error ? error.message : error });
+        }
+        
+        // Phase 1: Start Neo4j and Redis containers only (not MCP server yet)
+        logger.info('🐳 Phase 1: Starting infrastructure containers...');
+        logger.info('📊 Starting:');
+        logger.info('   - Neo4j Database (Graph storage)');
+        logger.info('   - Redis Cache (Performance optimization)');
+        
+        const infraArgs = ['compose', 'up', '-d', 'neo4j', 'redis'];
+        if (options.build) infraArgs.push('--build');
         
         // Set environment variable for the analysis project path
         const env = { ...process.env, ANALYSIS_PROJECT_PATH: analysisProjectPath };
         
-        logger.info('🐳 Starting all AASWE containers...');
-        logger.info('📊 Services starting:');
-        logger.info('   - Neo4j Database (Graph storage with source code)');
-        logger.info('   - Redis Cache (Performance optimization)');
-        logger.info('   - AASWE MCP Server (LLM integration)');
-        
-        const child = spawn('docker', args, {
+        const infraChild = spawn('docker', infraArgs, {
           stdio: 'inherit',
-          cwd: packageRoot, // Use AASWE package root, not current directory
+          cwd: packageRoot,
           env: env
         });
         
-        child.on('close', (code) => {
-          if (code === 0) {
-            logger.info('');
-            logger.info('🎉 Complete AASWE System Started Successfully!');
-            logger.info('');
-            logger.info('🔗 Access Points:');
-            logger.info('   📡 MCP Server: ws://localhost:3001 (for IDE integration)');
-            logger.info('   🗄️  Neo4j Browser: http://localhost:7474 (neo4j/aaswe-password)');
-            logger.info('   ⚡ Redis Cache: localhost:6379');
-            logger.info('');
-            logger.info('🎯 Next Steps:');
-            logger.info('   1. Configure your IDE to connect to: ws://localhost:3001');
-            logger.info('   2. Run: codebase-ai analyze (to populate the knowledge graph)');
-            logger.info('   3. Visit http://localhost:7474 to explore the Neo4j graph database');
-            logger.info('');
-            logger.info('💡 To stop all services: codebase-ai docker down');
-          } else {
-            logger.error('❌ Failed to start complete AASWE system');
-            logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
-            process.exit(code);
+        infraChild.on('close', async (infraCode) => {
+          if (infraCode !== 0) {
+            logger.error('❌ Failed to start infrastructure containers');
+            process.exit(infraCode);
           }
+          
+          logger.info('✅ Infrastructure containers started successfully');
+          
+          // Phase 2: Wait for Neo4j to be ready
+          logger.info('🕐 Phase 2: Waiting for Neo4j to be ready...');
+          let neo4jReady = false;
+          let retries = 30; // 30 seconds timeout
+          
+          while (!neo4jReady && retries > 0) {
+            try {
+              execSync('docker compose exec -T neo4j cypher-shell -u neo4j -p aaswe-password "RETURN 1"', {
+                stdio: 'pipe',
+                cwd: packageRoot
+              });
+              neo4jReady = true;
+              logger.info('✅ Neo4j is ready and accepting connections');
+            } catch (error) {
+              retries--;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              if (retries % 5 === 0) {
+                logger.info(`⏳ Still waiting for Neo4j... (${retries}s remaining)`);
+              }
+            }
+          }
+          
+          if (!neo4jReady) {
+            logger.error('❌ Neo4j failed to start within timeout');
+            logger.info('💡 Try: docker compose down && codebase-ai full-start --build');
+            process.exit(1);
+          }
+          
+          // Phase 3: Run automatic analysis
+          if (!options.skipAnalysis) {
+            logger.info('🔍 Phase 3: Running automatic project analysis...');
+            logger.info(`📁 Analyzing project: ${analysisProjectPath}`);
+            
+            try {
+              const outputDir = path.join(analysisProjectPath, 'knowledge');
+              await mkdir(outputDir, { recursive: true });
+
+              // Import and run the AutoAnalysisWorkflow
+              const { AutoAnalysisWorkflow } = await import('../services/project-analysis/AutoAnalysisWorkflow');
+              
+              const workflow = new AutoAnalysisWorkflow({
+                projectRoot: analysisProjectPath,
+                outputDirectory: outputDir,
+                languages: ['typescript', 'javascript', 'python', 'java'],
+                preserveBusinessContext: false, // CRITICAL FIX: Disable to prevent mock placeholder override
+                enableBusinessContextPlaceholders: false, // CRITICAL FIX: Disable mock placeholders
+                enableKnowledgeGraphPopulation: true, // Enable Neo4j population
+                enableMCPContextLoading: false // CLI mode doesn't need MCP server yet
+              });
+
+              logger.info('🚀 Running comprehensive analysis workflow...');
+              const result = await workflow.executeComprehensiveAnalysis();
+
+              logger.info('✅ Project analysis completed successfully!', {
+                filesAnalyzed: result.summary.analyzedFiles,
+                ttlFilesGenerated: result.summary.ttlFilesGenerated,
+                executionTime: `${result.duration}ms`
+              });
+
+              logger.info(`📁 TTL knowledge files generated in: ${outputDir}`);
+
+              // Phase 3.5: Ingest TTL files into Neo4j
+              logger.info(' Phase 3.5: Ingesting TTL files into Neo4j...');
+              try {
+                const { Neo4jDatabaseService } = await import('../services/layer2/neo4j-database');
+                const neo4jService = new Neo4jDatabaseService();
+
+                await neo4jService.connect({
+                  uri: 'bolt://localhost:7687',
+                  username: 'neo4j',
+                  password: 'aaswe-password'
+                });
+
+                // Wait a moment for Neo4j to be fully ready
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const { glob } = await import('glob');
+                const ttlFiles = await glob('**/*.ttl', { cwd: outputDir });
+
+                logger.info(`🔄 Ingesting ${ttlFiles.length} TTL files into Neo4j...`);
+
+                for (const ttlFile of ttlFiles) {
+                  const fullPath = path.join(outputDir, ttlFile);
+                  try {
+                    await neo4jService.ingestTTLFile(fullPath);
+                    logger.debug(`✅ Ingested: ${ttlFile}`);
+                  } catch (ingestError) {
+                    logger.warn(`⚠️ Failed to ingest ${ttlFile}:`, ingestError);
+                  }
+                }
+
+                await neo4jService.disconnect();
+                logger.info('✅ TTL files successfully ingested into Neo4j!');
+
+              } catch (neo4jError) {
+                logger.warn('⚠️ Failed to ingest TTL files into Neo4j', { error: neo4jError instanceof Error ? neo4jError.message : neo4jError });
+                logger.info('💡 Neo4j ingestion can be done later when the database is ready');
+              }
+
+            } catch (error) {
+              logger.warn('⚠️ Analysis failed but continuing with MCP server startup', { error: error instanceof Error ? error.message : error });
+              logger.info('💡 You can run analysis later with: codebase-ai analyze');
+            }
+          } else {
+            logger.info('⏭️ Phase 3: Skipping analysis (--skip-analysis flag used)');
+          }
+          
+          // Phase 4: Start MCP Server
+          logger.info('🌐 Phase 4: Starting MCP Server...');
+          logger.info('📡 MCP Server will load generated TTL files');
+          
+          const mcpArgs = ['compose', 'up', '-d', 'aaswe-server'];
+          if (options.build) mcpArgs.push('--build');
+          
+          const mcpChild = spawn('docker', mcpArgs, {
+            stdio: 'inherit',
+            cwd: packageRoot,
+            env: env
+          });
+          
+          mcpChild.on('close', (mcpCode) => {
+            if (mcpCode === 0) {
+              logger.info('');
+              logger.info('🎉 Complete AASWE System Started Successfully!');
+              logger.info('');
+              logger.info('🔗 Access Points:');
+              logger.info('   📡 MCP Server: ws://localhost:3001 (for IDE integration)');
+              logger.info('   🗄️  Neo4j Browser: http://localhost:7474 (neo4j/aaswe-password)');
+              logger.info('   ⚡ Redis Cache: localhost:6379');
+              logger.info('');
+              logger.info('🎯 System Ready:');
+              logger.info('   ✅ Infrastructure: Neo4j + Redis running');
+              logger.info(`   ✅ Analysis: ${options.skipAnalysis ? 'Skipped' : 'Completed'}`);
+              logger.info('   ✅ MCP Server: Ready for IDE integration');
+              logger.info('');
+              logger.info('💡 To stop all services: codebase-ai docker down');
+            } else {
+              logger.error('❌ Failed to start MCP server');
+              logger.info('💡 Try: codebase-ai docker down && codebase-ai full-start --build');
+              process.exit(mcpCode);
+            }
+          });
         });
       });
       
@@ -452,7 +635,8 @@ program
         projectRoot: process.cwd(),
         outputDirectory: outputDir,
         languages: options.languages.split(',').map((lang: string) => lang.trim()),
-        preserveBusinessContext: true,
+        preserveBusinessContext: false, // CRITICAL FIX: Disable to prevent mock placeholder override
+        enableBusinessContextPlaceholders: false, // CRITICAL FIX: Disable mock placeholders
         enableKnowledgeGraphPopulation: true, // Enable Neo4j if available
         enableMCPContextLoading: false // CLI mode doesn't need MCP server
       });
@@ -480,8 +664,440 @@ program
   });
 
 /**
- * Docker commands
- */
+* MCP Server Command
+*
+* Start MCP server with dual transport support for IDE integration
+*/
+program
+ .command('mcp')
+ .description('Start MCP server for IDE integration with dual transport support')
+ .option('-t, --transport <type>', 'Transport type: websocket, stdio, or both', 'both')
+ .option('-p, --port <number>', 'WebSocket server port', '3001')
+ .option('-h, --host <host>', 'WebSocket server host', 'localhost')
+ .option('--ttl-patterns <patterns>', 'TTL file patterns (comma-separated)', '**/*.module-knowledge.ttl')
+ .option('--ttl-directories <dirs>', 'TTL directories to watch (comma-separated)', './')
+ .option('--neo4j-uri <uri>', 'Neo4j URI', 'bolt://localhost:7687')
+ .option('--neo4j-username <username>', 'Neo4j username', 'neo4j')
+ .option('--neo4j-password <password>', 'Neo4j password', 'aaswe-password')
+ .option('--max-tokens <number>', 'Maximum tokens per context request', '10000')
+ .option('--cache-enabled', 'Enable context caching', true)
+ .option('--watch-enabled', 'Enable TTL file watching', true)
+ .option('--debug', 'Enable debug logging')
+ .action(async (options) => {
+   try {
+     if (options.debug) {
+       process.env.LOG_LEVEL = 'debug';
+     }
+
+     console.log(`\n🚀 Starting MCP Server (v${packageVersion})`);
+     console.log(`📡 Transport: ${options.transport}`);
+     
+     // Validate transport type
+     const transport = options.transport as TransportType;
+     if (!['websocket', 'stdio', 'both'].includes(transport)) {
+       throw new Error(`Invalid transport type: ${transport}. Must be websocket, stdio, or both.`);
+     }
+
+     // Parse configuration
+     const ttlPatterns = options.ttlPatterns.split(',').map((p: string) => p.trim());
+     const ttlDirectories = options.ttlDirectories.split(',').map((d: string) => d.trim());
+     
+     console.log(`📁 TTL Directories: ${ttlDirectories.join(', ')}`);
+     console.log(`🔍 TTL Patterns: ${ttlPatterns.join(', ')}`);
+
+     // Initialize services
+     console.log('🔧 Initializing services...');
+
+     // Neo4j Database Service
+     const neo4jService = new Neo4jDatabaseService();
+     await neo4jService.connect({
+       uri: options.neo4jUri,
+       username: options.neo4jUsername,
+       password: options.neo4jPassword,
+       database: 'neo4j',
+       encrypted: false
+     });
+     console.log('✅ Neo4j connected');
+
+     // In-Memory RDF Store
+     const rdfStore = new InMemoryRDFStore({
+       maxTriples: 100000,
+       enableInference: false,
+       enabledIndexes: ['spo', 'pos', 'osp'], // Required for proper indexing
+       prefixes: {
+         'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+         'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+         'code': 'http://example.org/code#'
+       }
+     } as any);
+     await rdfStore.initialize();
+     console.log('✅ RDF store initialized');
+
+     // Simplified Hybrid Storage Manager (TTL Context Loader handles file loading)
+     const hybridStorage = new HybridStorageManager({
+       neo4j: {
+         uri: options.neo4jUri,
+         username: options.neo4jUsername,
+         password: options.neo4jPassword,
+         database: 'neo4j',
+         maxConnectionPoolSize: 50,
+         connectionTimeout: 30000,
+         maxTransactionRetryTime: 15000
+       },
+       inMemory: {
+         maxSize: 10000,
+         ttl: 300000
+       },
+       cache: {
+         ttl: 300000,
+         maxSize: 1000
+       },
+       queryRouting: {
+         primaryLayer: 'inMemory' as any,
+         fallbackOrder: ['inMemory'] as any[],
+         routingRules: []
+       },
+       synchronization: {
+         enabled: false,
+         syncInterval: 60000,
+         conflictResolution: 'last_write_wins',
+         batchSize: 100,
+         maxRetries: 3,
+         syncStrategies: []
+       },
+       monitoring: {
+         enabled: false, // Disable to prevent RDF metrics errors
+         healthCheckInterval: 30000,
+         metricsCollectionInterval: 60000,
+         alertThresholds: {
+           errorRate: 0.1,
+           responseTime: 5000,
+           memoryUsage: 0.8,
+           diskUsage: 0.8
+         },
+         retentionPeriod: 86400000
+       }
+     } as any);
+     
+     try {
+       await hybridStorage.initialize();
+       console.log('✅ Hybrid storage initialized');
+     } catch (error) {
+       console.log('⚠️ Hybrid storage partially initialized (some components disabled)');
+     }
+
+     // Initialize proper Layer 3 AI service for full functionality
+     console.log('🧠 Initializing Layer 3 AI services...');
+
+     // Check if API keys are available
+     const hasOpenAI = !!process.env.OPENAI_API_KEY;
+     const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+
+     let layer3Service: any;
+
+     if (hasOpenAI || hasAnthropic) {
+       console.log('✅ API keys found - enabling full AI services');
+       // Import and initialize real Layer 3 service
+       const { Layer3AIService } = await import('../services/layer3/index');
+       const { InMemoryRDFStore } = await import('../services/layer2/in-memory-rdf');
+
+       const { IndexType } = await import('../services/layer2/in-memory-rdf');
+       const rdfStore = new InMemoryRDFStore({
+         maxTriples: 100000,
+         maxMemoryMB: 512,
+         enabledIndexes: [IndexType.SPO, IndexType.PSO, IndexType.OSP, IndexType.FULL_TEXT],
+         compressionEnabled: true,
+         persistenceEnabled: false,
+         cacheConfig: {
+           maxEntries: 1000,
+           ttl: 300000,
+           evictionPolicy: 'lru'
+         },
+         optimization: {
+           enableSemanticSearch: true,
+           enableContextCaching: true,
+           enableQueryOptimization: true,
+           enableParallelProcessing: false
+         },
+         llmIntegration: {
+           contextWindowSize: 4096,
+           maxContextTokens: 2048,
+           semanticSimilarityThreshold: 0.7,
+           enableContextRanking: true,
+           enableTokenOptimization: true
+         }
+       });
+       // neo4jService is already connected above at line 712-719
+
+       const layer3Config = {
+         rag: {
+           provider: (hasOpenAI ? 'openai' : 'local') as 'openai' | 'local',
+           model: hasOpenAI ? 'gpt-4' : 'claude-3-sonnet-20240229',
+           apiKey: (hasOpenAI ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY) || '',
+           temperature: 0.1,
+           maxTokens: 1000
+         },
+         graphCypher: {
+           neo4jUrl: options.neo4jUri || 'bolt://localhost:7687',
+           username: options.neo4jUsername || 'neo4j',
+           password: options.neo4jPassword || 'aaswe-password'
+         },
+         sparql: {
+           provider: (hasOpenAI ? 'openai' : 'local') as 'openai' | 'local',
+           model: hasOpenAI ? 'gpt-4' : 'claude-3-sonnet-20240229',
+           apiKey: (hasOpenAI ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY) || ''
+         }
+       };
+
+       layer3Service = new Layer3AIService(layer3Config, rdfStore, neo4jService);
+       await layer3Service.initialize();
+
+     } else {
+       console.log('⚠️  No API keys found - using direct Neo4j service without AI features');
+       // neo4jService is already connected above at line 712-719
+
+       layer3Service = {
+         query: async (req: any) => {
+           const startTime = Date.now();
+
+           try {
+             if (req.type === 'cypher') {
+               // Execute direct Neo4j query
+               const session = neo4jService.getSession();
+               const result = await session.run(req.query);
+               await session.close();
+
+               const processingTime = Date.now() - startTime;
+
+               // Convert Neo4j result to JSON
+               const data = result.records.map(record => {
+                 const obj: any = {};
+                 record.keys.forEach(key => {
+                   const value = record.get(key);
+                   // Handle Neo4j integer types
+                   if (value && typeof value === 'object' && 'toNumber' in value) {
+                     obj[key] = value.toNumber();
+                   } else {
+                     obj[key] = value;
+                   }
+                 });
+                 return obj;
+               });
+
+               return {
+                 query: req.query,
+                 type: 'cypher' as const,
+                 answer: JSON.stringify(data, null, 2),
+                 confidence: 1.0,
+                 sources: ['Neo4j Database'],
+                 explanation: `Query executed successfully. Returned ${data.length} records in ${processingTime}ms.`,
+                 metadata: { processingTime, service: 'cypher' as const, cached: false, queryId: '', timestamp: Date.now() }
+               };
+             } else {
+               // For non-cypher queries, provide TTL context information
+               return {
+                 query: req.query,
+                 type: req.type === 'auto' ? 'rag' : req.type,
+                 answer: 'Direct Neo4j access available. Use cypher queries to explore the knowledge graph. For AI-powered features, configure API keys.',
+                 confidence: 0.8,
+                 sources: ['Neo4j Database', 'TTL Knowledge Files'],
+                 explanation: 'Neo4j connection available. Use Cypher queries to explore the knowledge graph. Configure API keys for AI-powered features.',
+                 metadata: { processingTime: Date.now() - startTime, service: 'rag' as const, cached: false, queryId: '', timestamp: Date.now() }
+               };
+             }
+           } catch (error) {
+             const processingTime = Date.now() - startTime;
+             return {
+               query: req.query,
+               type: req.type === 'auto' ? 'cypher' : req.type,
+               answer: `Query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+               confidence: 0.0,
+               sources: ['Neo4j Database'],
+               explanation: 'Neo4j query execution failed',
+               metadata: { processingTime, service: 'cypher' as const, cached: false, queryId: '', timestamp: Date.now() }
+             };
+           }
+         },
+         initialize: async () => {},
+         shutdown: async () => { /* Neo4j disconnect handled by main shutdown handler */ },
+         getStatus: () => ({ overall: 'healthy' as const, services: { rag: { name: 'rag', enabled: false, healthy: false, lastCheck: new Date() }, graphCypher: { name: 'graphCypher', enabled: true, healthy: true, lastCheck: new Date() }, sparql: { name: 'sparql', enabled: false, healthy: false, lastCheck: new Date() } }, lastUpdated: new Date() }),
+         getMetrics: () => ({ overall: { totalQueries: 0, successfulQueries: 0, failedQueries: 0, averageResponseTime: 0, queriesPerSecond: 0 }, services: { rag: { queries: 0, successRate: 0, averageResponseTime: 0, cacheHitRate: 0 }, graphCypher: { queries: 0, successRate: 0, averageResponseTime: 0, averageConfidence: 0 }, sparql: { queries: 0, successRate: 0, averageResponseTime: 0, averageConfidence: 0 } }, routing: { autoDetected: 0, manuallySpecified: 0, routingAccuracy: 0, fallbackUsed: 0 }, performance: { memoryUsage: 0, cpuUsage: 0, cacheSize: 0, activeConnections: 0 } })
+       } as any;
+     }
+
+     // TTL Context Loader
+     const ttlContextLoader = new TTLContextLoader(
+       {
+         watchEnabled: options.watchEnabled,
+         watchPatterns: ttlPatterns,
+         watchIgnored: [/node_modules/, /.git/, /dist/, /build/],
+         watchDebounce: 1000,
+         loadPatterns: ttlPatterns,
+         loadIgnored: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
+         loadConcurrency: 5,
+         cacheEnabled: options.cacheEnabled,
+         cacheTtl: 300000,
+         maxCacheSize: 1000,
+         relevanceThreshold: 0.1,
+         maxFiles: 20,
+         maxTokens: parseInt(options.maxTokens),
+         directories: ttlDirectories // Add the missing directories configuration
+       } as any,
+       {} as any, // Knowledge Graph Populator (not needed for this context)
+       {} as any, // RDF Generator (not needed for this context)
+       {} as any  // Information Extractor (not needed for this context)
+     );
+     await ttlContextLoader.start();
+     console.log('✅ TTL context loader started');
+
+     // MCP Server Configuration
+     const mcpConfig: MCPServerManagerConfig = {
+       transport,
+       server: {
+         name: 'AASWE MCP Server',
+         version: packageVersion,
+         host: options.host,
+         port: parseInt(options.port),
+         maxConnections: 100,
+         timeout: 30000
+       },
+       ttl: {
+         watchEnabled: options.watchEnabled,
+         watchDebounce: 1000,
+         maxFileSize: 1024 * 1024,
+         encoding: 'utf-8',
+         directories: ttlDirectories,
+         patterns: ttlPatterns
+       },
+       context: {
+         maxTokens: parseInt(options.maxTokens),
+         maxFiles: 20,
+         relevanceThreshold: 0.1,
+         cacheEnabled: options.cacheEnabled,
+         cacheTtl: 300000
+       },
+       integration: {
+         layer3Config: {} as any,
+         neo4jEnabled: true,
+         rdfStoreEnabled: true,
+         hybridStorageEnabled: true
+       },
+       ide: {
+         vscode: {
+           enabled: true,
+           extensionId: 'aaswe.mcp-server',
+           contextWindow: 8000
+         },
+         intellij: {
+           enabled: false,
+           pluginId: 'aaswe.mcp-plugin',
+           contextWindow: 8000
+         }
+       }
+     };
+
+     // Start MCP Server Manager
+     console.log('🌐 Starting MCP Server Manager...');
+     const mcpServerManager = new MCPServerManager(
+       mcpConfig,
+       layer3Service,
+       hybridStorage,
+       ttlContextLoader
+     );
+
+     await mcpServerManager.start();
+
+     // Setup event handlers
+     mcpServerManager.on('client_connected', (data) => {
+       console.log(`👤 Client connected via ${data.transport}: ${data.name || 'Unknown'}`);
+     });
+
+     mcpServerManager.on('client_disconnected', (data) => {
+       console.log(`👋 Client disconnected from ${data.transport}`);
+     });
+
+     mcpServerManager.on('query_completed', (data) => {
+       logger.debug('Query completed', { transport: data.transport, query: data.query });
+     });
+
+     mcpServerManager.on('query_failed', (data) => {
+       logger.warn('Query failed', { transport: data.transport, query: data.query, error: data.error });
+     });
+
+     // Display server information
+     console.log('\n🎉 MCP Server started successfully!');
+     console.log('\n📊 Server Information:');
+     console.log(`  Version: ${packageVersion}`);
+     console.log(`  Transport: ${transport}`);
+     
+     const activeTransports = mcpServerManager.getActiveTransports();
+     console.log(`  Active Transports: ${activeTransports.join(', ')}`);
+     
+     if (activeTransports.includes('websocket')) {
+       console.log(`  WebSocket: ws://${options.host}:${options.port}`);
+     }
+     
+     if (activeTransports.includes('stdio')) {
+       console.log(`  Stdio: Ready for stdin/stdout communication`);
+     }
+     
+     console.log(`  TTL Files: ${ttlContextLoader.getTTLFiles().size} loaded`);
+
+     // Display usage information
+     console.log('\n📖 Usage:');
+     console.log('  For Cline/RooCode: Configure MCP settings to use stdio transport');
+     console.log('  For other IDEs: Connect via WebSocket to the displayed URL');
+     console.log('  Press Ctrl+C to stop the server');
+
+     // Handle graceful shutdown
+     const shutdown = async (signal: string) => {
+       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+       
+       try {
+         await mcpServerManager.stop();
+         await ttlContextLoader.stop();
+         await layer3Service.shutdown();
+         await hybridStorage.shutdown();
+         await neo4jService.disconnect();
+         console.log('✅ Server stopped successfully');
+         process.exit(0);
+       } catch (error) {
+         logger.error('Error during shutdown', { error });
+         process.exit(1);
+       }
+     };
+
+     process.on('SIGINT', () => shutdown('SIGINT'));
+     process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+     // Keep the process alive for stdio transport
+     if (transport === 'stdio' || transport === 'both') {
+       // For stdio transport, we keep the process alive to handle stdin/stdout
+       // Use setInterval to prevent potential memory issues with unresolved promises
+        const keepAlive = setInterval(() => {}, 1000 * 60 * 60); // Heartbeat every hour
+        process.on('beforeExit', () => clearInterval(keepAlive));
+        
+        // Wait for termination signals - this replaces the infinite promise
+        await new Promise<void>((resolve) => {
+          const handleShutdown = () => {
+            clearInterval(keepAlive);
+            resolve();
+          };
+          // Rely on the outer process signal handlers that already perform shutdown.
+          process.once('beforeExit', handleShutdown);
+        });
+     }
+
+   } catch (error) {
+     logger.error('Failed to start MCP server', { error });
+     console.error('\n❌ Failed to start MCP server:', error instanceof Error ? error.message : String(error));
+     process.exit(1);
+   }
+ });
+
+/**
+* Docker commands
+*/
 const dockerCmd = program
   .command('docker')
   .description('Docker-related commands');

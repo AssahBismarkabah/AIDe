@@ -136,10 +136,26 @@ export class JavaAnalyzer extends BaseAnalyzer {
     return nodes;
   }
 
-  protected async extractFunctions(ast: any, context: AnalysisContext): Promise<CodeFunction[]> {
+  protected async extractFunctions(_ast: any, _context: AnalysisContext): Promise<CodeFunction[]> {
+    // CRITICAL FIX: Methods are now properly nested in classes, so top-level functions should only contain
+    // standalone functions (which don't exist in Java). This prevents duplication and data structure conflicts.
     const functions: CodeFunction[] = [];
     
+    // In Java, all methods belong to classes, so we don't extract them here to avoid duplication
+    // The methods are now properly extracted and assigned in extractClasses()
+    
+    return functions;
+  }
+
+  protected async extractClasses(ast: any, context: AnalysisContext): Promise<CodeClass[]> {
+    const classes: CodeClass[] = [];
+    
     for (const cls of ast.classes || []) {
+      // Extract methods for this specific class
+      const classMethods: CodeFunction[] = [];
+      
+      console.log(`DEBUG JavaAnalyzer: Processing class "${cls.name}" with ${(cls.methods || []).length} methods`);
+      
       for (const method of cls.methods || []) {
         const func: CodeFunction = {
           id: this.generateId(),
@@ -157,21 +173,13 @@ export class JavaAnalyzer extends BaseAnalyzer {
           calls: this.extractJavaMethodCalls(method)
         };
         
-        functions.push(func);
+        classMethods.push(func);
       }
-    }
-    
-    return functions;
-  }
-
-  protected async extractClasses(ast: any, context: AnalysisContext): Promise<CodeClass[]> {
-    const classes: CodeClass[] = [];
-    
-    for (const cls of ast.classes || []) {
+      
       const classObj: CodeClass = {
         id: this.generateId(),
         name: cls.name,
-        methods: [],
+        methods: classMethods, // CRITICAL FIX: Assign actual methods instead of empty array
         properties: this.extractJavaClassProperties(cls),
         extends: cls.superClass || undefined,
         implements: cls.interfaces || [],
@@ -308,8 +316,10 @@ export class JavaAnalyzer extends BaseAnalyzer {
       classes: []
     };
 
-    if (cst.children?.compilationUnit) {
-      const compilationUnit = cst.children.compilationUnit[0];
+    const compilationUnit =
+      cst.children?.ordinaryCompilationUnit?.[0] ??
+      cst.children?.compilationUnit?.[0];
+    if (compilationUnit) {
       
       // Extract package declaration
       if (compilationUnit.children?.packageDeclaration) {
@@ -473,7 +483,16 @@ export class JavaAnalyzer extends BaseAnalyzer {
   }
 
   private extractMethodDeclaration(methodDecl: any, bodyDecl: any): any {
-    const methodName = this.extractIdentifier(methodDecl.children?.methodHeader?.[0]?.children?.methodDeclarator?.[0]?.children?.identifier?.[0]);
+    // CRITICAL FIX: Extract method name directly from methodDeclarator.children.Identifier[0].image
+    const methodDeclarator = methodDecl.children?.methodHeader?.[0]?.children?.methodDeclarator?.[0];
+    let methodName = '';
+    
+    if (methodDeclarator?.children?.Identifier?.[0]?.image) {
+      methodName = methodDeclarator.children.Identifier[0].image;
+    }
+    
+
+    
     const returnType = this.extractType(methodDecl.children?.methodHeader?.[0]?.children?.result?.[0]);
     const modifiers = this.extractModifiers(bodyDecl.children?.modifier);
     const parameters = this.extractMethodParameters(methodDecl.children?.methodHeader?.[0]?.children?.methodDeclarator?.[0]);
@@ -491,7 +510,14 @@ export class JavaAnalyzer extends BaseAnalyzer {
   }
 
   private extractConstructorDeclaration(constructorDecl: any, bodyDecl: any): any {
-    const constructorName = this.extractIdentifier(constructorDecl.children?.constructorDeclarator?.[0]?.children?.simpleTypeName?.[0]?.children?.typeIdentifier?.[0]);
+    // CRITICAL FIX: Constructor names follow similar pattern
+    const constructorDeclarator = constructorDecl.children?.constructorDeclarator?.[0];
+    let constructorName = '';
+    
+    if (constructorDeclarator?.children?.simpleTypeName?.[0]?.children?.typeIdentifier?.[0]?.children?.Identifier?.[0]?.image) {
+      constructorName = constructorDeclarator.children.simpleTypeName[0].children.typeIdentifier[0].children.Identifier[0].image;
+    }
+    
     const modifiers = this.extractModifiers(bodyDecl.children?.modifier);
     const parameters = this.extractMethodParameters(constructorDecl.children?.constructorDeclarator?.[0]);
     const body = this.extractMethodBodyFromCST(constructorDecl.children?.constructorBody?.[0]);
@@ -508,7 +534,14 @@ export class JavaAnalyzer extends BaseAnalyzer {
   }
 
   private extractInterfaceMethodDeclaration(methodDecl: any, memberDecl: any): any {
-    const methodName = this.extractIdentifier(methodDecl.children?.methodHeader?.[0]?.children?.methodDeclarator?.[0]?.children?.identifier?.[0]);
+    // CRITICAL FIX: Interface method names follow same pattern as regular methods
+    const methodDeclarator = methodDecl.children?.methodHeader?.[0]?.children?.methodDeclarator?.[0];
+    let methodName = '';
+    
+    if (methodDeclarator?.children?.Identifier?.[0]?.image) {
+      methodName = methodDeclarator.children.Identifier[0].image;
+    }
+    
     const returnType = this.extractType(methodDecl.children?.methodHeader?.[0]?.children?.result?.[0]);
     const modifiers = this.extractModifiers(memberDecl.children?.interfaceMethodModifier);
     const parameters = this.extractMethodParameters(methodDecl.children?.methodHeader?.[0]?.children?.methodDeclarator?.[0]);
@@ -623,7 +656,39 @@ export class JavaAnalyzer extends BaseAnalyzer {
   }
 
   private extractIdentifier(identifier: any): string {
-    return identifier?.image || '';
+    if (!identifier) return '';
+    
+    // Try direct image first (for leaf nodes)
+    if (identifier.image) {
+      return identifier.image;
+    }
+    
+    // Navigate CST structure for java-parser nested identifiers
+    if (identifier.children?.Identifier?.[0]?.image) {
+      return identifier.children.Identifier[0].image;
+    }
+    
+    // Handle typeIdentifier and other nested structures
+    if (identifier.children?.typeIdentifier?.[0]) {
+      return this.extractIdentifier(identifier.children.typeIdentifier[0]);
+    }
+    
+    // Handle identifier nested in children
+    if (identifier.children?.identifier?.[0]) {
+      return this.extractIdentifier(identifier.children.identifier[0]);
+    }
+    
+    // Additional handling for method identifiers which might be nested differently
+    if (identifier.children?.Identifier && Array.isArray(identifier.children.Identifier)) {
+      for (const id of identifier.children.Identifier) {
+        if (id?.image) {
+          return id.image;
+        }
+      }
+    }
+    
+    // Fallback to empty string if no identifier found
+    return '';
   }
 
   private extractType(typeNode: any): string {
