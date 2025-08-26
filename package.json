@@ -1,6 +1,6 @@
 {
   "name": "@aaswe/codebase-ai",
-  "version": "1.1.8",
+  "version": "2.0.0",
   "description": "AI-Assisted Software Engineering (AASWE) - Rich codebase context for IDE LLMs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
