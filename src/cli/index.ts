@@ -208,7 +208,7 @@ program
   .description('Start complete AASWE system with all containers (Neo4j + MCP Server + Redis) and auto-analyze project')
   .option('--project-path <path>', 'Custom project path for analysis (not docker-compose location)', process.cwd())
   .option('--detach', 'Run containers in background')
-  .option('--build', 'Rebuild containers before starting')
+  .option('--build', 'Rebuild containers before starting (only for source installations)')
   .option('--skip-analysis', 'Skip automatic project analysis')
   .action(async (options) => {
     try {
@@ -314,11 +314,42 @@ program
           process.exit(1);
         }
       }
+
+      // Detect if this is an npm installation vs source installation
+      const isSourceInstallation = fs.existsSync(path.join(packageRoot, 'src')) &&
+                                   fs.existsSync(path.join(packageRoot, 'tsconfig.json')) &&
+                                   fs.existsSync(path.join(packageRoot, 'package.json'));
+      
+      // Validate --build flag usage
+      if (options.build && !isSourceInstallation) {
+        logger.error('❌ --build flag cannot be used with npm installations');
+        logger.error('');
+        logger.error('🔍 Issue: You\'re using a pre-built package, not source code');
+        logger.error('💡 Solution: Remove the --build flag');
+        logger.error('');
+        logger.info('✅ Correct command: codebase-ai full-start');
+        logger.info('📦 This will use pre-built Docker images automatically');
+        logger.error('');
+        logger.info('🛠️  If you need to modify the source code:');
+        logger.info('   1. Clone the repository: git clone https://github.com/your-org/aaswe');
+        logger.info('   2. Run from source: npm run build && npm start');
+        process.exit(1);
+      }
       
       logger.info('🚀 Starting Complete AASWE System with All Containers...');
       logger.info('📦 This includes: Neo4j Database + Redis Cache + Auto-Analysis + MCP Server');
       logger.info(`🎯 Analysis will target: ${analysisProjectPath}`);
       logger.info(`🐳 Using docker-compose from: ${packageRoot}`);
+      
+      if (isSourceInstallation) {
+        logger.info('🔧 Running from source installation');
+        if (options.build) {
+          logger.info('🏗️  --build flag enabled - rebuilding containers');
+        }
+      } else {
+        logger.info('📦 Running from npm package installation');
+        logger.info('🖼️  Using pre-built Docker images');
+      }
       
       // Check if Docker is available
       const { spawn, execSync } = require('child_process');
@@ -380,7 +411,44 @@ program
         logger.info('📊 Starting:');
         logger.info('   - Neo4j Database (Graph storage)');
         logger.info('   - Redis Cache (Performance optimization)');
-        
+
+        // Check Docker Compose availability
+        logger.info('🔍 Checking Docker Compose availability...');
+        try {
+          const composeCheck = spawn('docker', ['compose', '--help'], {
+            stdio: 'pipe',
+            timeout: 5000
+          });
+
+          await new Promise<void>((resolve, reject) => {
+            composeCheck.on('close', (code: number | null) => {
+              if (code === 0) {
+                logger.info('✅ Docker Compose V2 detected');
+                resolve();
+              } else {
+                reject(new Error(`Docker Compose check failed with code ${code}`));
+              }
+            });
+            composeCheck.on('error', reject);
+          });
+        } catch (error) {
+          logger.error('❌ Docker Compose V2 not available');
+          logger.error('');
+          logger.error('🔧 Required: Docker Compose V2 (docker compose)');
+          logger.error('');
+          logger.error('📋 Installation options:');
+          logger.error('   1. Install Docker Desktop (includes Compose V2)');
+          logger.error('   2. Install Docker Compose plugin:');
+          logger.error('      sudo apt-get update && sudo apt-get install docker-compose-plugin');
+          logger.error('   3. Follow official guide: https://docs.docker.com/compose/install/');
+          logger.error('');
+          logger.error('🧪 Test after installation:');
+          logger.error('   docker compose --help');
+          logger.error('');
+          logger.info('💡 Alternative: Clone repository and use manual Docker commands');
+          process.exit(1);
+        }
+
         const infraArgs = ['compose', 'up', '-d'];
         if (options.build) infraArgs.push('--build');
         infraArgs.push('neo4j', 'redis');
@@ -447,29 +515,51 @@ program
               const outputDir = path.join(analysisProjectPath, 'knowledge');
               await mkdir(outputDir, { recursive: true });
 
+              // CRITICAL FIX: Disable background Git monitoring to prevent automatic analysis of AASWE repository
+              logger.info('🔇 Disabling background Git monitoring to prevent interference');
+              
+              // Temporarily disable Git monitoring environment variables
+              const originalGitEnv = process.env.DISABLE_GIT_MONITORING;
+              process.env.DISABLE_GIT_MONITORING = 'true';
+              
               // Import and run the AutoAnalysisWorkflow
               const { AutoAnalysisWorkflow } = await import('../services/project-analysis/AutoAnalysisWorkflow');
+              
+              // Change current working directory to target project to prevent analyzing AASWE
+              const originalCwd = process.cwd();
+              process.chdir(analysisProjectPath);
               
               const workflow = new AutoAnalysisWorkflow({
                 projectRoot: analysisProjectPath,
                 outputDirectory: outputDir,
                 languages: ['typescript', 'javascript', 'python', 'java'],
-                preserveBusinessContext: false, // CRITICAL FIX: Disable to prevent mock placeholder override
-                enableBusinessContextPlaceholders: false, // CRITICAL FIX: Disable mock placeholders
+                preserveBusinessContext: false, //  Disable to prevent mock placeholder override
+                enableBusinessContextPlaceholders: false, //  Disable mock placeholders
                 enableKnowledgeGraphPopulation: true, // Enable Neo4j population
-                enableMCPContextLoading: false // CLI mode doesn't need MCP server yet
+                enableMCPContextLoading: false // mode doesn't need MCP server yet
               });
+              
+              try {
+                logger.info('🚀 Running comprehensive analysis workflow...');
+                const result = await workflow.executeComprehensiveAnalysis();
 
-              logger.info('🚀 Running comprehensive analysis workflow...');
-              const result = await workflow.executeComprehensiveAnalysis();
+                logger.info('✅ Project analysis completed successfully!', {
+                  filesAnalyzed: result.summary.analyzedFiles,
+                  ttlFilesGenerated: result.summary.ttlFilesGenerated,
+                  executionTime: `${result.duration}ms`
+                });
 
-              logger.info('✅ Project analysis completed successfully!', {
-                filesAnalyzed: result.summary.analyzedFiles,
-                ttlFilesGenerated: result.summary.ttlFilesGenerated,
-                executionTime: `${result.duration}ms`
-              });
-
-              logger.info(`📁 TTL knowledge files generated in: ${outputDir}`);
+                logger.info(`📁 TTL knowledge files generated in: ${outputDir}`);
+              } finally {
+                // Restore original working directory and Git monitoring
+                process.chdir(originalCwd);
+                if (originalGitEnv !== undefined) {
+                  process.env.DISABLE_GIT_MONITORING = originalGitEnv;
+                } else {
+                  delete process.env.DISABLE_GIT_MONITORING;
+                }
+                logger.info('🔊 Background Git monitoring restored');
+              }
 
               // Phase 3.5: Ingest TTL files into Neo4j
               logger.info(' Phase 3.5: Ingesting TTL files into Neo4j...');

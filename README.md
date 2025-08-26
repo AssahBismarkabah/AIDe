@@ -22,7 +22,7 @@ cd your-project
 codebase-ai start
 
 # For complete system (Neo4j + MCP Server + Redis)
-codebase-ai full-start --build
+codebase-ai full-start
 
 # Start MCP server for IDE integration
 codebase-ai mcp --transport both
@@ -44,7 +44,7 @@ cd AIDe
 npm install
 npm run build
 
-# Run locally
+# Run locally (from source)
 node dist/cli/index.js full-start --build
 ```
 
@@ -127,9 +127,34 @@ AASWE creates these files:
 - `.env.aaswe` - Environment variables
 - `.aaswe/` - Analysis cache and knowledge files
 
-## ⚠️ Prerequisites for Full System Mode
+## ⚠️ Important: --build Flag Usage
 
-Before running `codebase-ai full-start --build`, ensure you have:
+### When to Use --build Flag
+The `--build` flag is **only for developers working with source code**:
+
+```bash
+# Source installation (cloned repository)
+git clone https://github.com/AssahBismarkabah/AIDe.git
+cd AIDe
+node dist/cli/index.js full-start --build
+```
+
+### When NOT to Use --build Flag
+**Never use `--build` with npm installations:**
+
+```bash
+# This will fail with npm installations
+npm install -g @aaswe/codebase-ai
+codebase-ai full-start --build  # ← Will fail!
+
+# Use without --build for npm installations
+npm install -g @aaswe/codebase-ai
+codebase-ai full-start  # ← Uses pre-built images
+```
+
+## Prerequisites for Full System Mode
+
+Before running `codebase-ai full-start`, ensure you have:
 
 ### Docker Compose V2 Required
 ```bash
@@ -152,7 +177,12 @@ docker --version
 ```bash
 # This should work without errors:
 docker compose --help
+
+# If you see "unknown command" or "command not found":
+# You need to install Docker Compose V2 first!
 ```
+
+> **Tip**: The CLI will automatically check for Docker Compose availability and provide installation instructions if missing.
 
 ##  Usage
 
@@ -167,6 +197,9 @@ codebase-ai start
 codebase-ai start --mode full --port 8000
 
 # Complete system with all containers (Neo4j + MCP + Redis)
+codebase-ai full-start
+
+# For source installations only
 codebase-ai full-start --build
 
 # With debug logging
@@ -231,11 +264,14 @@ AASWE provides **dual-transport MCP support** for maximum IDE compatibility:
 #### RooCode / Cline (Stdio Transport)
 1. **Start AASWE System** (in your project directory):
 ```bash
-# Option 1: Full system with containers
+# Option 1: Full system with containers (npm installation)
+codebase-ai full-start --project-path ./your-project
+
+# Option 1b: Full system with containers (source installation)
 node dist/cli/index.js full-start --project-path ./your-project --build
 
 # Option 2: Standalone MCP server (TTL files only)
-node dist/cli/index.js mcp --transport stdio --ttl-directories ./your-project
+codebase-ai mcp --transport stdio --ttl-directories ./your-project
 ```
 
 2. **Add to RooCode/Cline MCP Settings**:
@@ -466,7 +502,30 @@ docker-compose ps neo4j
 docker-compose restart neo4j
 
 # Start full system properly
-codebase-ai full-start --build
+codebase-ai full-start
+
+```
+#### "Docker Compose Not Available"
+If you see `unknown shorthand flag: 'd' in -d` or similar Docker errors:
+
+```bash
+# Check if Docker Compose is installed
+docker compose --help
+
+# If command not found, install Docker Compose V2:
+
+# Option 1: Install Docker Desktop (includes Compose V2)
+# Download from: https://docs.docker.com/desktop/
+
+# Option 2: Install Compose plugin (Linux)
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
+
+# Option 3: Manual installation
+# Follow: https://docs.docker.com/compose/install/
+
+# Verify installation
+docker compose version
 ```
 
 #### "Docker Compose V1 Compatibility"
@@ -487,8 +546,6 @@ docker-compose up -d --build neo4j redis
 # Then in another terminal (from your project directory):
 codebase-ai start --mode full
 ```
-
-> **⚠️ Important**: The NPM package's docker-compose.yml is not accessible to `docker-compose` V1 commands. You must either upgrade to V2 or clone the repository to access the compose file.
 
 
 #### "MCP Server Connection Issues"
@@ -620,7 +677,5 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 - **Docker**: For containerization and easy deployment
 
 ---
-
-**Made with ❤️ by the AASWE Team**
 
 *Transform your codebase into intelligent context for better AI-assisted development.*

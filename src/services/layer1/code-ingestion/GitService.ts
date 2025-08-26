@@ -204,6 +204,12 @@ export class GitService extends EventEmitter {
    * Check for changes in a repository
    */
   async checkForChanges(repositoryId: string): Promise<void> {
+    // CRITICAL FIX: Check if Git monitoring is disabled to prevent automatic analysis during CLI operations needs to be fixed properly 
+    if (process.env.DISABLE_GIT_MONITORING === 'true') {
+      logger.debug('Git monitoring is disabled, skipping change detection');
+      return;
+    }
+
     const repository = this.repositories.get(repositoryId);
     if (!repository) {
       return;
