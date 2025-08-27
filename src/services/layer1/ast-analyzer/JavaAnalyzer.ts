@@ -3,7 +3,7 @@
  * Implements AST analysis for Java files using java-parser
  */
 
-import { parse } from 'java-parser';
+// Note: java-parser is an ES module, so we'll use dynamic import
 import { BaseAnalyzer } from './BaseAnalyzer';
 import {
   AnalysisContext,
@@ -26,6 +26,8 @@ export class JavaAnalyzer extends BaseAnalyzer {
   protected async parseAST(content: string, _context: AnalysisContext): Promise<any> {
     try {
       // Use proper Java parser for production-quality AST analysis
+      // Dynamic import to handle ES module
+      const { parse } = await import('java-parser');
       const cst = parse(content);
       return this.convertCSTToAST(cst);
     } catch (error) {
