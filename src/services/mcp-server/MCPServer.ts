@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 import logger from '../../utils/logger';
 import { AIQueryRequest, AIQueryResponse } from '../layer3/index';
 import { HybridStorageManager } from '../layer2/hybrid-storage/HybridStorageManager';
+import { RAGSparqlService } from '../layer3/rag-sparql-integration';
 
 // Generic query service interface that can be either Layer3AIService or direct Neo4j service
 interface QueryService {
@@ -50,6 +51,7 @@ import {
  * MCP Server for IDE Integration
  */
 export class MCPServer extends EventEmitter {
+  private ragSparqlService?: RAGSparqlService;
   private config: MCPServerConfig;
   private server: Server;
   private wsServer: WebSocketServer;
@@ -80,6 +82,17 @@ export class MCPServer extends EventEmitter {
     // this._hybridStorage = hybridStorage;
     // Store for future use when needed
     hybridStorage;
+
+    // Initialize optional RAG+SPARQL integration
+    if (this.config.integration?.layer3Config?.ragSparql?.enabled) {
+      try {
+        this.ragSparqlService = new RAGSparqlService();
+        logger.info('RAG+SPARQL integration enabled');
+      } catch (error) {
+        logger.warn('Failed to initialize RAG+SPARQL integration', { error });
+      }
+    }
+
     this.metrics = this.initializeMetrics();
     
     // Create HTTP server with health endpoint
@@ -367,6 +380,22 @@ export class MCPServer extends EventEmitter {
         }
       }
     ];
+
+    // Conditionally expose RAG+SPARQL tool
+    if (this.ragSparqlService) {
+      tools.push({
+        name: 'ragSparqlQuery',
+        description: 'Ask a natural language question over RDF knowledge and enrich with RAG',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            question: { type: 'string', description: 'Natural language question' },
+            maxContextDocs: { type: 'number', description: 'Limit number of RDF result docs to feed into RAG' }
+          },
+          required: ['question']
+        }
+      });
+    }
 
     return { tools };
   }

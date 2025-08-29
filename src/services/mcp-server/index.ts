@@ -140,6 +140,9 @@ export function createDefaultMCPConfig(): MCPServerConfig {
             maxSize: 1000
           }
         },
+        ragSparql: {
+          enabled: false
+        },
         global: {
           defaultProvider: 'openai',
           fallbackProvider: 'openai',
