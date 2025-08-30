@@ -155,6 +155,11 @@ export interface Layer3Config {
     };
   };
 
+  // RAG+SPARQL integration toggle
+  ragSparql?: {
+    enabled: boolean;
+  };
+
   // Global settings
   global: {
     defaultProvider: 'openai' | 'anthropic' | 'local';

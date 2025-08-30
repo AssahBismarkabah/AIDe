@@ -56,6 +56,7 @@ program
   .option('--project-path <path>', 'Custom project path', process.cwd())
   .option('--no-watch', 'Disable TTL file watching')
   .option('--debug', 'Enable debug logging')
+  .option('--enable-rag-sparql', 'Enable RAG + SPARQL integration (Layer 3)')
   .action(async (options) => {
     try {
       if (options.debug) {
@@ -77,6 +78,19 @@ program
       const config = options.config ?
         require(join(projectPath, options.config)) :
         createDefaultMCPConfig();
+
+      // Enable RAG+SPARQL integration if requested
+      if (options.enableRagSparql) {
+        try {
+          if (!config.integration) config.integration = {} as any;
+          if (!config.integration.layer3Config) config.integration.layer3Config = {} as any;
+          if (!config.integration.layer3Config.ragSparql) config.integration.layer3Config.ragSparql = { enabled: true };
+          else config.integration.layer3Config.ragSparql.enabled = true;
+          logger.info('RAG+SPARQL integration enabled via CLI flag');
+        } catch (e) {
+          logger.warn('Failed to set RAG+SPARQL flag in config', { error: e });
+        }
+      }
 
       config.server.port = parseInt(options.port);
       config.ttl.watchEnabled = options.watch;
