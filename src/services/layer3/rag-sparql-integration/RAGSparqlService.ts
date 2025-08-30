@@ -24,7 +24,7 @@ export class RAGSparqlService {
       } as any);
       const sparqlConfig: SPARQLEngineConfig = {
         rdf: { timeout: 30000, maxResults: 1000 },
-        llm: { provider: 'openai', model: 'gpt-4', temperature: 0.1, maxTokens: 1000 },
+        llm: { provider: 'openai', model: 'gpt-4', maxTokens: 1000 },
         queryGeneration: { maxRetries: 2, timeoutMs: 15000, validateSyntax: true, optimizeQuery: true, usePatterns: true },
         prefixes: {
           'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
@@ -46,7 +46,7 @@ export class RAGSparqlService {
       const ragConfig: RAGConfig = {
         vectorStore: { type: 'memory', dimensions: 1536, similarity: 'cosine' },
         retrieval: { topK: 5, scoreThreshold: 0.7, maxTokens: 4000, contextWindow: 8000 },
-        llm: { provider: 'openai', model: 'gpt-4', temperature: 0.1, maxTokens: 1000 },
+        llm: { provider: 'openai', model: 'gpt-4', maxTokens: 1000 },
         embeddings: { provider: 'openai', model: 'text-embedding-ada-002', dimensions: 1536 },
         cache: { enabled: true, ttl: 300000, maxSize: 1000 }
       };

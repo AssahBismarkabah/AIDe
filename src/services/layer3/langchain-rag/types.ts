@@ -20,7 +20,6 @@ export interface RAGConfig {
   llm: {
     provider: 'openai' | 'anthropic' | 'local';
     model: string;
-    temperature: number;
     maxTokens: number;
   };
   
